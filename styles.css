@@ -1,0 +1,148 @@
+/* styles.css - Styling för Bricklink Inventory Checker */
+
+#bricklink-inventory-indicator,
+#bricklink-list-indicator,
+#bricklink-inv-indicator,
+#bricklink-wanted-indicator {
+  animation: slideIn 0.3s ease-out;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes buttonPop {
+  0% {
+    transform: translate(-50%, -50%) scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+
+#bricklink-inventory-indicator:hover,
+#bricklink-list-indicator:hover,
+#bricklink-inv-indicator:hover,
+#bricklink-wanted-indicator:hover {
+  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+  transition: box-shadow 0.2s ease;
+}
+
+/* Fill-button för wanted list */
+#bricklink-fill-btn:hover {
+  transform: translate(-50%, -50%) scale(1.05) !important;
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.6) !important;
+  transition: all 0.2s ease !important;
+}
+
+/* Styling för "owned" badges på listsidor */
+.bricklink-owned-badge {
+  animation: badgePop 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes badgePop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Hover-effekt på markerade items */
+td:has(.bricklink-owned-badge):hover,
+div:has(.bricklink-owned-badge):hover {
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.5) !important;
+  transition: box-shadow 0.2s ease;
+}
+
+/* Styling för inventory indicator boxes på parts list */
+.bricklink-inventory-indicator-box {
+  animation: badgePop 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* Hover-effekt på inventory indikatorer */
+.bricklink-inventory-indicator-box:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+  transition: all 0.2s ease;
+}
+
+/* Styling för wanted list badges */
+.bricklink-wanted-badge {
+  animation: badgePop 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.bricklink-wanted-badge:hover {
+  transform: scale(1.05);
+  box-shadow: 0 3px 6px rgba(0,0,0,0.25) !important;
+  transition: all 0.2s ease;
+}
+
+/* Responsiv design för mindre skärmar */
+@media (max-width: 768px) {
+  #bricklink-inventory-indicator,
+  #bricklink-list-indicator,
+  #bricklink-inv-indicator,
+  #bricklink-wanted-indicator {
+    top: 10px !important;
+    right: 10px !important;
+    min-width: 180px !important;
+    font-size: 12px !important;
+  }
+  
+  .bricklink-owned-badge,
+  .bricklink-inventory-indicator-box,
+  .bricklink-wanted-badge {
+    font-size: 10px !important;
+    padding: 3px 6px !important;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  #bricklink-inventory-indicator,
+  #bricklink-list-indicator,
+  #bricklink-inv-indicator,
+  #bricklink-wanted-indicator {
+    background: #1f2937 !important;
+    border-color: #374151 !important;
+    color: #e5e7eb !important;
+  }
+  
+  #bricklink-inventory-indicator div,
+  #bricklink-list-indicator div,
+  #bricklink-inv-indicator div,
+  #bricklink-wanted-indicator div {
+    color: #e5e7eb !important;
+  }
+}

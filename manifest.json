@@ -1,0 +1,53 @@
+
+{
+  "manifest_version": 3,
+  "name": "Bricklink Inventory Checker",
+  "version": "1.0",
+  "description": "Kollar om du har Bricklink items i ditt inventory",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://www.bricklink.com/*",
+    "https://api.bricklink.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.bricklink.com/v2/catalog/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    },
+    {
+      "matches": ["https://www.bricklink.com/catalogList.asp*"],
+      "js": ["catalog-list.js"],
+      "css": ["styles.css"]
+    },
+    {
+      "matches": ["https://www.bricklink.com/catalogItemInv.asp*"],
+      "js": ["catalog-inventory.js"],
+      "css": ["styles.css"]
+    },
+    {
+      "matches": ["https://www.bricklink.com/v2/wanted/search.page*"],
+      "js": ["wanted-list.js"],
+      "css": ["styles.css"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

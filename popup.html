@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      width: 350px;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+    }
+    h2 {
+      margin-top: 0;
+      color: #333;
+      font-size: 18px;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      color: #555;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 13px;
+    }
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      width: 100%;
+      margin-top: 10px;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    .status {
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+    .status.success {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .status.error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .info {
+      background: #f3f4f6;
+      padding: 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #666;
+      line-height: 1.5;
+    }
+    .info a {
+      color: #3b82f6;
+      text-decoration: none;
+    }
+    .info a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <h2>Bricklink Inventory Checker</h2>
+  
+  <div class="info">
+    För att använda denna extension behöver du API-nycklar från Bricklink.
+    <br><br>
+    Skapa API-nycklar här:<br>
+    <a href="https://www.bricklink.com/v2/api/register_consumer.page" target="_blank">
+      Bricklink API Register
+    </a>
+  </div>
+  
+  <div class="section">
+    <label>Consumer Key:</label>
+    <input type="text" id="apiKey" placeholder="Din Consumer Key">
+  </div>
+  
+  <div class="section">
+    <label>Consumer Secret:</label>
+    <input type="password" id="apiSecret" placeholder="Din Consumer Secret">
+  </div>
+  
+  <div class="section">
+    <label>Token Value:</label>
+    <input type="text" id="tokenValue" placeholder="Din Token Value">
+  </div>
+  
+  <div class="section">
+    <label>Token Secret:</label>
+    <input type="password" id="tokenSecret" placeholder="Din Token Secret">
+  </div>
+  
+  <button id="saveBtn">Spara API-nycklar</button>
+  <button id="testBtn" style="background: #10b981; margin-top: 5px;">Testa API-anslutning</button>
+  
+  <div id="status"></div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
