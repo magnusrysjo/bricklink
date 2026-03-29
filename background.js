@@ -236,8 +236,8 @@ async function updateInventoryQuantities(items) {
           await makeApiRequest('DELETE', `/inventories/${entry.inventory_id}`, credentials);
           console.log(`🗑️ Tog bort inventory-post ${entry.inventory_id} (${itemNo})`);
         } else {
-          await makeApiRequest('PUT', `/inventories/${entry.inventory_id}`, credentials, { quantity: newQuantity });
-          console.log(`✏️ Uppdaterade ${itemNo}: ${entry.quantity} → ${newQuantity}`);
+          await makeApiRequest('PUT', `/inventories/${entry.inventory_id}`, credentials, { quantity: -toRemove });
+          console.log(`✏️ Uppdaterade ${itemNo}: ${entry.quantity} → ${entry.quantity - toRemove}`);
         }
         remaining -= toRemove;
         updatedCount++;

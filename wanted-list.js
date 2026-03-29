@@ -262,6 +262,19 @@
         } else {
           btn.textContent = `✓ ${updatedCount} poster uppdaterade`;
           btn.style.setProperty('background', '#10b981', 'important');
+
+          // Uppdatera lokalt matchedItems så badges reflekterar nya antal
+          payload.forEach(removed => {
+            const item = matchedItems.find(
+              m => m.itemNo === removed.itemNo &&
+                   (m.colorId || '').toString() === (removed.colorId || '').toString()
+            );
+            if (item) item.quantityOwned = Math.max(0, item.quantityOwned - removed.quantityToRemove);
+          });
+          matchedItems = matchedItems.filter(m => m.quantityOwned > 0);
+          document.querySelectorAll('.bricklink-wanted-badge').forEach(b => b.remove());
+          injectBadges();
+
           // Ta bort knappen efter 4 sekunder
           setTimeout(() => wrap.remove(), 4000);
         }
