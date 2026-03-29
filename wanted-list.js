@@ -459,13 +459,19 @@
     
     button.onclick = () => {
       console.log(`🖱️ Fyller i värde: ${valueToSet}`);
-      
-      // Sätt värdet
-      input.value = valueToSet.toString();
-      
-      // Trigga events
+
+      // React kontrollerar input-värdet via sin interna state och ignorerar
+      // direkta tilldelningar till input.value. Lösningen är att anropa den
+      // nativa prototyp-settern, vilket tvingar React att detektera ändringen.
+      const nativeSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        'value'
+      ).set;
+      nativeSetter.call(input, valueToSet.toString());
+
+      // Dispatcha ett input-event med bubbling så React's syntetiska
+      // event-system fångar upp förändringen och uppdaterar sin state.
       input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
       
       // Ta bort knappen
       button.remove();
@@ -604,6 +610,9 @@
         let ownedFullyCount = 0;
         let ownedPartiallyCount = 0;
         
+        // Rensa map inför ny körning
+        itemInventoryMap.clear();
+
         // Kolla varje item
         items.forEach(item => {
           console.log(`\n🔍 Kollar: ${item.itemType} ${item.itemNo} (färg ID: ${item.colorId || 'ej specificerad'})`);
@@ -618,12 +627,22 @@
               console.log(`⚠️ HAR DELVIS: ${item.itemType} ${item.itemNo} (färg ${item.colorId || 'N/A'}) - Har ${inventoryData.quantity}, vill ha ${item.quantityWanted}`);
             }
             
+            // Spara data i map så Have-fält-lyssnaren kan hämta det
+            const itemKey = `${item.itemType}-${item.itemNo}-${item.colorId || 'none'}`;
+            itemInventoryMap.set(itemKey, {
+              quantityOwned: inventoryData.quantity,
+              quantityWanted: item.quantityWanted
+            });
+
             markItemAsOwned(item.element, item.link, inventoryData.quantity, item.quantityWanted, item.colorId, item.colorName);
           } else {
             console.log(`❌ SAKNAS: ${item.itemType} ${item.itemNo} (färg ${item.colorId || 'N/A'})`);
           }
         });
         
+        // Sätt upp lyssnare för Have-fält nu när kartan är ifylld
+        setupHaveFieldListener();
+
         // Uppdatera status
         let statusMsg = '';
         
