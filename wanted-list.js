@@ -6,109 +6,48 @@
   let inventory = null;
   let processing = false;
 
-  // Bricklink färgnamn → färg-ID mappning
   const COLOR_NAME_TO_ID = {
-    'black': '11',
-    'blue': '7',
-    'bright green': '36',
-    'bright light blue': '105',
-    'bright light orange': '110',
-    'bright light yellow': '103',
-    'bright pink': '104',
-    'brown': '8',
-    'coral': '220',
-    'dark azure': '321',
-    'dark blue': '63',
-    'dark bluish gray': '85',
-    'dark brown': '120',
-    'dark gray': '10',
-    'dark green': '80',
-    'dark orange': '68',
-    'dark pink': '47',
-    'dark purple': '89',
-    'dark red': '59',
-    'dark tan': '69',
-    'dark turquoise': '39',
-    'green': '6',
-    'lavender': '154',
-    'light aqua': '152',
-    'light bluish gray': '86',
-    'light gray': '9',
-    'light green': '38',
-    'light pink': '56',
-    'light purple': '93',
-    'light salmon': '26',
-    'light turquoise': '40',
-    'light yellow': '33',
-    'lime': '34',
-    'magenta': '71',
-    'medium azure': '156',
-    'medium blue': '42',
-    'medium dark pink': '94',
-    'medium lavender': '157',
-    'medium orange': '31',
-    'olive green': '155',
-    'orange': '4',
-    'pearl gold': '115',
-    'pink': '23',
-    'purple': '24',
-    'red': '5',
-    'reddish brown': '88',
-    'sand blue': '55',
-    'sand green': '48',
-    'tan': '2',
-    'trans-black': '32',
-    'trans-bright green': '108',
-    'trans-clear': '12',
-    'trans-dark blue': '14',
-    'trans-dark pink': '50',
-    'trans-green': '20',
-    'trans-light blue': '15',
-    'trans-light green': '35',
-    'trans-medium blue': '74',
-    'trans-neon green': '16',
-    'trans-neon orange': '18',
-    'trans-neon yellow': '121',
-    'trans-orange': '98',
-    'trans-purple': '51',
-    'trans-red': '17',
-    'trans-yellow': '19',
-    'white': '1',
-    'yellow': '3',
+    'black': '11', 'blue': '7', 'bright green': '36', 'bright light blue': '105',
+    'bright light orange': '110', 'bright light yellow': '103', 'bright pink': '104',
+    'brown': '8', 'coral': '220', 'dark azure': '321', 'dark blue': '63',
+    'dark bluish gray': '85', 'dark brown': '120', 'dark gray': '10', 'dark green': '80',
+    'dark orange': '68', 'dark pink': '47', 'dark purple': '89', 'dark red': '59',
+    'dark tan': '69', 'dark turquoise': '39', 'green': '6', 'lavender': '154',
+    'light aqua': '152', 'light bluish gray': '86', 'light gray': '9', 'light green': '38',
+    'light pink': '56', 'light purple': '93', 'light salmon': '26', 'light turquoise': '40',
+    'light yellow': '33', 'lime': '34', 'magenta': '71', 'medium azure': '156',
+    'medium blue': '42', 'medium dark pink': '94', 'medium lavender': '157',
+    'medium orange': '31', 'olive green': '155', 'orange': '4', 'pearl gold': '115',
+    'pink': '23', 'purple': '24', 'red': '5', 'reddish brown': '88', 'sand blue': '55',
+    'sand green': '48', 'tan': '2', 'trans-black': '32', 'trans-bright green': '108',
+    'trans-clear': '12', 'trans-dark blue': '14', 'trans-dark pink': '50',
+    'trans-green': '20', 'trans-light blue': '15', 'trans-light green': '35',
+    'trans-medium blue': '74', 'trans-neon green': '16', 'trans-neon orange': '18',
+    'trans-neon yellow': '121', 'trans-orange': '98', 'trans-purple': '51',
+    'trans-red': '17', 'trans-yellow': '19', 'white': '1', 'yellow': '3',
     'yellowish green': '158'
   };
 
-  // Extrahera item info från URL
   function parseItemUrl(url) {
     try {
-      const urlObj = new URL(url, window.location.origin);
-      const params = new URLSearchParams(urlObj.search);
-
-      let itemType = null;
-      let itemNo = null;
-      let colorId = null;
-
+      const params = new URLSearchParams(new URL(url, window.location.origin).search);
+      let itemType = null, itemNo = null, colorId = null;
       if (params.has('P')) { itemType = 'PART'; itemNo = params.get('P'); }
       else if (params.has('S')) { itemType = 'SET'; itemNo = params.get('S'); }
       else if (params.has('M')) { itemType = 'MINIFIG'; itemNo = params.get('M'); }
       else if (params.has('G')) { itemType = 'GEAR'; itemNo = params.get('G'); }
       else if (params.has('B')) { itemType = 'BOOK'; itemNo = params.get('B'); }
-
       if (params.has('idColor') || params.has('ColorID')) {
         colorId = params.get('idColor') || params.get('ColorID');
       }
-
       return { itemType, itemNo, colorId };
     } catch (e) {
       return { itemType: null, itemNo: null, colorId: null };
     }
   }
 
-  // Hitta alla items i wanted listan
   function findAllWantedItems() {
     const items = [];
-    console.log('🔍 Letar efter items i wanted list...');
-
     const links = document.querySelectorAll('a[href*="catalogitem.page"]');
 
     links.forEach(link => {
@@ -137,28 +76,22 @@
         const colorLink = row.querySelector('a[href*="idColor"], a[href*="ColorID"]');
         if (colorLink) {
           const m = parseItemUrl(colorLink.href);
-          if (m.colorId) {
-            colorId = m.colorId;
-            colorName = colorLink.textContent.trim();
-          }
+          if (m.colorId) { colorId = m.colorId; colorName = colorLink.textContent.trim(); }
         }
       }
 
       let quantityWanted = 1;
       for (const match of [
-        rowText.match(/Qty:\s*(\d+)/i),
-        rowText.match(/Wanted:\s*(\d+)/i),
-        rowText.match(/Want:\s*(\d+)/i),
-        rowText.match(/Quantity:\s*(\d+)/i),
+        rowText.match(/Qty:\s*(\d+)/i), rowText.match(/Wanted:\s*(\d+)/i),
+        rowText.match(/Want:\s*(\d+)/i), rowText.match(/Quantity:\s*(\d+)/i),
         rowText.match(/(\d+)\s*x/i)
       ]) {
         if (match) { quantityWanted = parseInt(match[1]); break; }
       }
 
-      items.push({ itemType, itemNo, colorId, colorName, quantityWanted, element: row, link });
+      items.push({ itemType, itemNo, colorId, colorName, quantityWanted, link });
     });
 
-    // Ta bort duplicates
     const seen = new Set();
     return items.filter(item => {
       const key = `${item.itemType}-${item.itemNo}-${item.colorId || 'no-color'}`;
@@ -168,26 +101,19 @@
     });
   }
 
-  // Kolla om ett item finns i inventory
   function getItemInventory(itemType, itemNo, colorId) {
     if (!inventory || !Array.isArray(inventory)) return { found: false, quantity: 0 };
-
     const matchingItems = inventory.filter(item => {
       if (!item.item || item.item.type !== itemType || item.item.no !== itemNo) return false;
       if (colorId) return item.color_id && item.color_id.toString() === colorId.toString();
       return true;
     });
-
     if (matchingItems.length === 0) return { found: false, quantity: 0 };
-
-    const totalQuantity = matchingItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    return { found: true, quantity: totalQuantity };
+    return { found: true, quantity: matchingItems.reduce((s, i) => s + (i.quantity || 0), 0) };
   }
 
-  // Fyll i ett React-kontrollerat input-fält med ett värde
+  // Fyll i ett React-kontrollerat input via nativa prototyp-settern
   function fillReactInput(input, value) {
-    // React åsidosätter input.value-settern; använd nativa prototyp-settern
-    // för att React ska detektera ändringen.
     const nativeSetter = Object.getOwnPropertyDescriptor(
       window.HTMLInputElement.prototype, 'value'
     ).set;
@@ -196,55 +122,69 @@
     console.log(`✅ Have-fält ifyllt med ${value}`);
   }
 
-  // Hitta Have-fältet i en rad och fyll i värdet.
-  // Fältet är React-renderat och visas inte förrän man klickar på det.
-  function activateAndFillHaveField(rowElement, value) {
-    // Steg 1: finns ett input redan (fältet redan aktiverat)?
-    const existingInput = rowElement.querySelector('input[type="text"], input:not([type])');
+  // Hitta rätt rad i den aktuella DOM:en för ett givet item och fyll Have-fältet
+  function fillHaveFieldForItem(itemNo, colorId, value) {
+    // Hitta länken för detta item i nuvarande DOM (React kan ha re-renderat)
+    const links = Array.from(document.querySelectorAll('a[href*="catalogitem.page"]'));
+    const itemLink = links.find(link => {
+      const { itemNo: no } = parseItemUrl(link.href);
+      return no === itemNo;
+    });
+
+    if (!itemLink) {
+      console.warn(`⚠️ Hittade inte länk för ${itemNo} i DOM:en`);
+      return;
+    }
+
+    const row = itemLink.closest('tr') ||
+                itemLink.closest('div[class*="row"]') ||
+                itemLink.closest('div[class*="item"]') ||
+                itemLink.parentElement;
+
+    if (!row) {
+      console.warn('⚠️ Hittade inte rad för item');
+      return;
+    }
+
+    // Kolla om input redan finns (fältet redan aktiverat)
+    const existingInput = row.querySelector('input');
     if (existingInput) {
       fillReactInput(existingInput, value);
       return;
     }
 
-    // Steg 2: hitta klickbart Have-element och aktivera det
-    // BrickLink markerar redigerbara fält med klassen wl-hover-editable
+    // Hitta Have-fältet och aktivera det
     let haveTarget = null;
 
-    const editables = rowElement.querySelectorAll('.wl-hover-editable');
-    for (const el of editables) {
-      if (el.textContent.includes('Have')) {
-        haveTarget = el;
-        break;
-      }
+    // Försök 1: BrickLink's wl-hover-editable klass
+    for (const el of row.querySelectorAll('.wl-hover-editable')) {
+      if (/have/i.test(el.textContent)) { haveTarget = el; break; }
     }
 
-    // Fallback: sök efter text "Have" i celler
+    // Försök 2: cell/div som innehåller "Have" utan att vara en länk
     if (!haveTarget) {
-      const cells = rowElement.querySelectorAll('td, div');
-      for (const cell of cells) {
-        if (/\bHave\b/i.test(cell.textContent) && !cell.querySelector('a')) {
-          haveTarget = cell;
+      for (const el of row.querySelectorAll('td, span, div')) {
+        if (/\bHave\b/i.test(el.textContent) && !el.querySelector('a') && el.children.length < 3) {
+          haveTarget = el;
           break;
         }
       }
     }
 
     if (!haveTarget) {
-      console.warn('⚠️ Kunde inte hitta Have-fältet i raden');
+      console.warn('⚠️ Hittade inte Have-fältet – loggar rad-HTML:');
+      console.log(row.innerHTML.substring(0, 500));
       return;
     }
 
-    // Observera Have-elementet för att fånga när React renderar input
+    // Vänta på att React renderar input-fältet efter klick
     const observer = new MutationObserver((mutations, obs) => {
       for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
           if (node.nodeType !== 1) continue;
-          const input = node.tagName === 'INPUT'
-            ? node
-            : node.querySelector('input');
+          const input = node.tagName === 'INPUT' ? node : node.querySelector('input');
           if (input) {
             obs.disconnect();
-            // Liten fördröjning så React hinner montera fältet fullt
             setTimeout(() => fillReactInput(input, value), 50);
             return;
           }
@@ -252,113 +192,120 @@
       }
     });
 
-    observer.observe(haveTarget, { childList: true, subtree: true });
+    observer.observe(row, { childList: true, subtree: true });
     setTimeout(() => observer.disconnect(), 3000);
-
-    // Klicka för att aktivera React-fältet
     haveTarget.click();
   }
 
-  // Markera ett item som "har i inventory" och lägg till Fill-knapp
-  function markItemAsOwned(element, link, quantityOwned, quantityWanted, colorId, colorName) {
-    const valueToSet = quantityOwned >= quantityWanted ? quantityWanted : quantityOwned;
+  // Bygg den fasta panelen med Fill-knappar (lever utanför React's DOM)
+  function buildFillPanel(matchedItems) {
+    // Ta bort eventuell gammal panel
+    const old = document.getElementById('bricklink-fill-panel');
+    if (old) old.remove();
 
-    // --- Badge ---
-    const badge = document.createElement('span');
-    badge.className = 'bricklink-wanted-badge';
-    badge.style.cssText = `
-      display: inline-block !important;
-      margin-left: 8px !important;
-      padding: 3px 8px !important;
-      border-radius: 4px !important;
-      font-weight: bold !important;
-      font-size: 11px !important;
-      vertical-align: middle !important;
+    const panel = document.createElement('div');
+    panel.id = 'bricklink-fill-panel';
+    panel.style.cssText = `
+      position: fixed !important;
+      top: 60px !important;
+      right: 16px !important;
+      width: 260px !important;
+      max-height: 80vh !important;
+      overflow-y: auto !important;
+      background: #fff !important;
+      border: 2px solid #d1d5db !important;
+      border-radius: 10px !important;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.15) !important;
+      z-index: 2147483647 !important;
+      font-family: Arial, sans-serif !important;
+      font-size: 12px !important;
     `;
 
-    if (quantityOwned >= quantityWanted) {
-      badge.style.setProperty('background', '#10b981', 'important');
-      badge.style.setProperty('color', 'white', 'important');
-      badge.textContent = `✓ Har ${quantityOwned}`;
-    } else {
-      badge.style.setProperty('background', '#f59e0b', 'important');
-      badge.style.setProperty('color', 'white', 'important');
-      badge.textContent = `⚠ Har ${quantityOwned}/${quantityWanted}`;
-    }
-
-    if (colorId && colorName) badge.title = `Färg: ${colorName}`;
-
-    // --- Fill-knapp ---
-    const fillBtn = document.createElement('button');
-    fillBtn.className = 'bricklink-fill-have-btn';
-    fillBtn.textContent = `Fill ${valueToSet}`;
-    fillBtn.title = `Klicka för att fylla i ${valueToSet} i Have-fältet`;
-    fillBtn.style.cssText = `
-      display: inline-block !important;
-      margin-left: 6px !important;
-      padding: 3px 8px !important;
-      border-radius: 4px !important;
-      font-size: 11px !important;
-      font-weight: bold !important;
-      cursor: pointer !important;
-      border: 1px solid #2563eb !important;
-      background: #3b82f6 !important;
-      color: white !important;
-      vertical-align: middle !important;
+    // Header
+    const header = document.createElement('div');
+    header.style.cssText = `
+      padding: 10px 12px !important;
+      background: #f9fafb !important;
+      border-bottom: 1px solid #e5e7eb !important;
+      border-radius: 8px 8px 0 0 !important;
+      display: flex !important;
+      justify-content: space-between !important;
+      align-items: center !important;
     `;
+    header.innerHTML = `
+      <span style="font-weight:bold;color:#111">⭐ Inventory (${matchedItems.length})</span>
+      <button id="bl-panel-close" style="background:none;border:none;cursor:pointer;font-size:16px;color:#888;padding:0">✕</button>
+    `;
+    panel.appendChild(header);
 
-    fillBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      activateAndFillHaveField(element, valueToSet);
+    // Rader per item
+    matchedItems.forEach(item => {
+      const row = document.createElement('div');
+      row.style.cssText = `
+        padding: 7px 12px !important;
+        border-bottom: 1px solid #f3f4f6 !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        gap: 6px !important;
+      `;
+
+      const isEnough = item.quantityOwned >= item.quantityWanted;
+      const badgeColor = isEnough ? '#10b981' : '#f59e0b';
+      const badgeText = isEnough
+        ? `✓ ${item.quantityOwned}`
+        : `⚠ ${item.quantityOwned}/${item.quantityWanted}`;
+
+      row.innerHTML = `
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${item.itemNo} – ${item.colorName || ''}">
+          <strong>${item.itemNo}</strong>
+          ${item.colorName ? `<span style="color:#888"> ${item.colorName}</span>` : ''}
+        </span>
+        <span style="background:${badgeColor};color:white;padding:2px 6px;border-radius:4px;white-space:nowrap;font-weight:bold">
+          ${badgeText}
+        </span>
+      `;
+
+      const fillBtn = document.createElement('button');
+      fillBtn.textContent = `Fill ${item.valueToSet}`;
+      fillBtn.style.cssText = `
+        background: #3b82f6 !important;
+        color: white !important;
+        border: none !important;
+        padding: 4px 8px !important;
+        border-radius: 4px !important;
+        cursor: pointer !important;
+        font-size: 11px !important;
+        font-weight: bold !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+      `;
+      fillBtn.addEventListener('click', () => {
+        fillHaveFieldForItem(item.itemNo, item.colorId, item.valueToSet);
+        fillBtn.textContent = '✓';
+        fillBtn.style.setProperty('background', '#10b981', 'important');
+        setTimeout(() => {
+          fillBtn.textContent = `Fill ${item.valueToSet}`;
+          fillBtn.style.setProperty('background', '#3b82f6', 'important');
+        }, 2000);
+      });
+
+      row.appendChild(fillBtn);
+      panel.appendChild(row);
     });
 
-    // Lägg till badge och knapp bredvid länken
-    if (link.parentElement) {
-      link.parentElement.insertBefore(badge, link.nextSibling);
-      link.parentElement.insertBefore(fillBtn, badge.nextSibling);
+    if (matchedItems.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'padding:12px;color:#888;text-align:center';
+      empty.textContent = 'Inga items från wanted list i inventory';
+      panel.appendChild(empty);
     }
 
-    // Subtil bakgrundsfärg på raden
-    if (element) {
-      element.style.setProperty('background-color', 'rgba(16, 185, 129, 0.08)', 'important');
-      element.style.setProperty('border-left', '3px solid #10b981', 'important');
-    }
-  }
+    document.body.appendChild(panel);
 
-  // Skapa status-indikator
-  function createStatusIndicator() {
-    const indicator = document.createElement('div');
-    indicator.id = 'bricklink-wanted-indicator';
-    indicator.style.cssText = `
-      position: fixed;
-      top: 80px;
-      right: 20px;
-      background: white;
-      border: 2px solid #ddd;
-      border-radius: 8px;
-      padding: 15px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      z-index: 10000;
-      font-family: Arial, sans-serif;
-      min-width: 250px;
-      max-width: 350px;
-    `;
-    indicator.innerHTML = `
-      <div style="font-weight: bold; margin-bottom: 8px; color: #333; font-size: 14px;">
-        ⭐ Wanted List Check
-      </div>
-      <div id="bricklink-wanted-status" style="color: #666; font-size: 13px; line-height: 1.5;">
-        Laddar...
-      </div>
-    `;
-    document.body.appendChild(indicator);
-    return indicator;
-  }
+    document.getElementById('bl-panel-close').addEventListener('click', () => panel.remove());
 
-  function updateStatus(message, color = '#666') {
-    const el = document.getElementById('bricklink-wanted-status');
-    if (el) { el.innerHTML = message; el.style.color = color; }
+    return panel;
   }
 
   // Huvudfunktion
@@ -375,16 +322,26 @@
       return;
     }
 
-    const indicator = createStatusIndicator();
-    updateStatus('⏳ Hämtar inventory...');
+    // Visa laddnings-indikator
+    const loadingDiv = document.createElement('div');
+    loadingDiv.id = 'bricklink-loading';
+    loadingDiv.style.cssText = `
+      position: fixed !important; top: 60px !important; right: 16px !important;
+      background: white !important; border: 2px solid #ddd !important;
+      border-radius: 8px !important; padding: 12px 16px !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+      z-index: 2147483647 !important; font-family: Arial, sans-serif !important;
+      font-size: 13px !important; color: #666 !important;
+    `;
+    loadingDiv.textContent = '⏳ Hämtar inventory...';
+    document.body.appendChild(loadingDiv);
 
     try {
       let responseReceived = false;
-
       const timeout = setTimeout(() => {
         if (!responseReceived) {
-          updateStatus('⚠️ Timeout - API svarar inte', '#f59e0b');
-          setTimeout(() => indicator.remove(), 5000);
+          loadingDiv.textContent = '⚠️ Timeout';
+          setTimeout(() => loadingDiv.remove(), 3000);
           processing = false;
         }
       }, 30000);
@@ -392,62 +349,48 @@
       chrome.runtime.sendMessage({ action: 'getFullInventory' }, response => {
         responseReceived = true;
         clearTimeout(timeout);
+        loadingDiv.remove();
 
         if (!response || response.error) {
-          updateStatus('⚠️ Kunde ej hämta inventory', '#f59e0b');
           console.error('❌', response ? response.error : 'No response');
-          setTimeout(() => indicator.remove(), 5000);
           processing = false;
           return;
         }
 
         inventory = response.inventory;
-
         if (!inventory || !Array.isArray(inventory)) {
-          updateStatus('⚠️ Inventory är tomt', '#f59e0b');
-          setTimeout(() => indicator.remove(), 5000);
+          console.error('❌ Ogiltigt inventory');
           processing = false;
           return;
         }
 
         console.log(`✅ Inventory hämtat: ${inventory.length} items`);
-        updateStatus('🔍 Analyserar wanted list...');
 
         const items = findAllWantedItems();
         console.log(`🔍 Hittade ${items.length} items i wanted list`);
 
-        let ownedFullyCount = 0;
-        let ownedPartiallyCount = 0;
+        const matchedItems = [];
 
         items.forEach(item => {
-          const inventoryData = getItemInventory(item.itemType, item.itemNo, item.colorId);
-
-          if (inventoryData.found) {
-            if (inventoryData.quantity >= item.quantityWanted) ownedFullyCount++;
-            else ownedPartiallyCount++;
-
-            markItemAsOwned(
-              item.element, item.link,
-              inventoryData.quantity, item.quantityWanted,
-              item.colorId, item.colorName
-            );
+          const inv = getItemInventory(item.itemType, item.itemNo, item.colorId);
+          if (inv.found) {
+            matchedItems.push({
+              ...item,
+              quantityOwned: inv.quantity,
+              valueToSet: inv.quantity >= item.quantityWanted
+                ? item.quantityWanted
+                : inv.quantity
+            });
           }
         });
 
-        const total = ownedFullyCount + ownedPartiallyCount;
-        let statusMsg = total > 0
-          ? `✓ Tillräckligt: ${ownedFullyCount}<br>⚠ Delvis: ${ownedPartiallyCount}<br>❌ Saknas: ${items.length - total}<br><small>${total} av ${items.length} har Fill-knapp</small>`
-          : `Inga items från wanted list i inventory<br><small>${items.length} items totalt</small>`;
-
-        updateStatus(statusMsg, total > 0 ? '#10b981' : '#666');
-
-        setTimeout(() => indicator.remove(), 8000);
+        console.log(`✅ ${matchedItems.length} items med inventory-matchning`);
+        buildFillPanel(matchedItems);
         processing = false;
       });
     } catch (error) {
       console.error('❌', error);
-      updateStatus('⚠️ Fel vid kommunikation', '#f59e0b');
-      setTimeout(() => indicator.remove(), 5000);
+      loadingDiv.remove();
       processing = false;
     }
   }
