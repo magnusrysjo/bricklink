@@ -316,8 +316,10 @@ async function getFullInventoryForList() {
         !credentials.tokenValue || !credentials.tokenSecret) {
       return { error: 'API credentials not configured' };
     }
-    const inventory = await getCachedInventory(credentials);
-    return { inventory };
+    // Hämta alltid färsk data vid sidladdning och uppdatera cachen
+    inventoryCache = await fetchInventory(credentials);
+    cacheTimestamp = Date.now();
+    return { inventory: inventoryCache };
   } catch (error) {
     return { error: error.message };
   }
