@@ -192,6 +192,29 @@
     observer.observe(document.body, { childList: true, subtree: true });
   }
 
+  // Läs av Have-fältets värde för ett item i aktuell DOM
+  function getHaveValue(item) {
+    const links = document.querySelectorAll('a[href*="catalogitem.page"]');
+    for (const link of links) {
+      const { itemNo } = parseItemUrl(link.href);
+      if (itemNo !== item.itemNo) continue;
+
+      const row = link.closest('tr') ||
+                  link.closest('div[class*="row"]') ||
+                  link.closest('div[class*="item"]') ||
+                  link.parentElement;
+      if (!row) continue;
+
+      // Hitta alla number/text-inputs i raden
+      const inputs = row.querySelectorAll('input[type="number"], input[type="text"]');
+      for (const input of inputs) {
+        const val = parseInt(input.value, 10);
+        if (!isNaN(val) && val > 0) return val;
+      }
+    }
+    return 0;
+  }
+
   // Visa en knapp för att ta bort matchade items från inventory
   function showRemoveButton(itemsToRemove) {
     const old = document.getElementById('bl-remove-btn-wrap');
@@ -220,7 +243,7 @@
       cursor: pointer !important;
       box-shadow: 0 4px 12px rgba(239,68,68,0.4) !important;
     `;
-    btn.textContent = `🗑 Ta bort ${itemsToRemove.length} items från inventory`;
+    btn.textContent = `🗑 Ta bort Have-markerade items från inventory`;
 
     const status = document.createElement('div');
     status.style.cssText = `
@@ -235,12 +258,23 @@
       btn.style.setProperty('background', '#9ca3af', 'important');
       btn.textContent = '⏳ Uppdaterar...';
 
-      const payload = itemsToRemove.map(item => ({
-        itemType: item.itemType,
-        itemNo: item.itemNo,
-        colorId: item.colorId,
-        quantityToRemove: Math.min(item.quantityOwned, item.quantityWanted)
-      }));
+      // Läs Have-fältets aktuella värde för varje item, begränsat av vad som faktiskt finns i inventory
+      const payload = itemsToRemove
+        .map(item => ({
+          itemType: item.itemType,
+          itemNo: item.itemNo,
+          colorId: item.colorId,
+          quantityToRemove: Math.min(getHaveValue(item), item.quantityOwned)
+        }))
+        .filter(item => item.quantityToRemove > 0);
+
+      if (payload.length === 0) {
+        btn.textContent = `🗑 Ta bort Have-markerade items från inventory`;
+        btn.style.setProperty('background', '#ef4444', 'important');
+        btn.disabled = false;
+        status.textContent = 'Inga Have-fält är ifyllda.';
+        return;
+      }
 
       chrome.runtime.sendMessage({ action: 'updateInventoryQuantities', items: payload }, response => {
         if (response && response.error) {
