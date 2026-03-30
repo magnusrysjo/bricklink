@@ -192,27 +192,30 @@
     observer.observe(document.body, { childList: true, subtree: true });
   }
 
-  // Läs av Have-fältets värde för ett item i aktuell DOM.
-  // Klättrar uppåt i DOM-trädet tills vi hittar en icke-checkbox input.
+  // Läs av Have-värdet för ett item i aktuell DOM.
+  // BrickLink renderar Have som <small class="text success">N</small>
+  // inuti .wl-col-quantity > .wl-hover-editable (den med "Have:"-text).
   function getHaveValue(item) {
     const links = document.querySelectorAll('a[href*="catalogitem.page"]');
     for (const link of links) {
       const { itemNo } = parseItemUrl(link.href);
       if (itemNo !== item.itemNo) continue;
 
+      // Klättra uppåt tills vi hittar en container med .wl-col-quantity
       let el = link.parentElement;
       for (let depth = 0; depth < 12 && el && el !== document.body; depth++) {
-        const inputs = el.querySelectorAll('input:not([type="checkbox"])');
-        if (inputs.length > 0) {
-          console.log(`[BL] ${item.itemNo}: hittade ${inputs.length} icke-checkbox input(s) på djup ${depth}`);
-          inputs.forEach((inp, i) => {
-            console.log(`[BL]   input[${i}] type="${inp.type}" value="${inp.value}" placeholder="${inp.placeholder}" class="${inp.className}"`);
-          });
-          for (const input of inputs) {
-            const val = parseInt(input.value, 10);
-            if (!isNaN(val) && val > 0) return val;
+        const quantityCol = el.querySelector('.wl-col-quantity');
+        if (quantityCol) {
+          const haveSection = Array.from(quantityCol.querySelectorAll('.wl-hover-editable'))
+            .find(div => div.textContent.includes('Have:'));
+          if (haveSection) {
+            const smallEl = haveSection.querySelector('small.text');
+            if (smallEl) {
+              const val = parseInt(smallEl.textContent.trim(), 10);
+              console.log(`[BL] ${item.itemNo}: Have-värde=${val}`);
+              return isNaN(val) ? 0 : val;
+            }
           }
-          // Hittade inputs men inget värde > 0 – fortsätt inte klättra
           return 0;
         }
         el = el.parentElement;
