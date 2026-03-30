@@ -212,7 +212,6 @@
             const smallEl = haveSection.querySelector('small.text');
             if (smallEl) {
               const val = parseInt(smallEl.textContent.trim(), 10);
-              console.log(`[BL] ${item.itemNo}: Have-värde=${val}`);
               return isNaN(val) ? 0 : val;
             }
           }
@@ -263,7 +262,6 @@
     `;
 
     btn.addEventListener('click', async () => {
-      console.log(`[BL] Knapp klickad, itemsToRemove.length=${itemsToRemove.length}`);
       btn.disabled = true;
       btn.style.setProperty('background', '#9ca3af', 'important');
       btn.textContent = '⏳ Uppdaterar...';
