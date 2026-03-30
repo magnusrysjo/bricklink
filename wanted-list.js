@@ -205,8 +205,12 @@
                   link.parentElement;
       if (!row) continue;
 
-      // Hitta alla number/text-inputs i raden
-      const inputs = row.querySelectorAll('input[type="number"], input[type="text"]');
+      const inputs = row.querySelectorAll('input');
+      console.log(`[BL] ${item.itemNo}: hittade ${inputs.length} inputs i raden`);
+      inputs.forEach((inp, i) => {
+        console.log(`[BL]   input[${i}] type="${inp.type}" value="${inp.value}" placeholder="${inp.placeholder}" class="${inp.className}"`);
+      });
+
       for (const input of inputs) {
         const val = parseInt(input.value, 10);
         if (!isNaN(val) && val > 0) return val;
