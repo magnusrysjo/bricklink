@@ -258,6 +258,7 @@
     `;
 
     btn.addEventListener('click', async () => {
+      console.log(`[BL] Knapp klickad, itemsToRemove.length=${itemsToRemove.length}`);
       btn.disabled = true;
       btn.style.setProperty('background', '#9ca3af', 'important');
       btn.textContent = '⏳ Uppdaterar...';
