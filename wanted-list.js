@@ -111,7 +111,7 @@
     if (!inventory || !Array.isArray(inventory)) return { found: false, quantity: 0 };
     const matching = inventory.filter(item => {
       if (!item.item || item.item.type !== itemType || item.item.no !== itemNo) return false;
-      if (colorId) return item.color_id && item.color_id.toString() === colorId.toString();
+      if (colorId != null) return item.color_id != null && item.color_id.toString() === colorId.toString();
       return true;
     });
     if (matching.length === 0) return { found: false, quantity: 0 };

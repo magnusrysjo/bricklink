@@ -214,7 +214,7 @@ async function updateInventoryQuantities(items) {
     // Hitta alla inventory-poster för detta item + färg
     const entries = inventoryCache.filter(inv => {
       if (!inv.item || inv.item.type !== itemType || inv.item.no !== itemNo) return false;
-      if (colorId) return inv.color_id && inv.color_id.toString() === colorId.toString();
+      if (colorId != null) return inv.color_id != null && inv.color_id.toString() === colorId.toString();
       return true;
     });
 
