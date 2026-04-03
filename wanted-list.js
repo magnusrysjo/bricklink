@@ -384,6 +384,7 @@
 
       items.forEach(item => {
         const inv = getItemInventory(item.itemType, item.itemNo, item.colorId);
+        console.log(`[BL] ${item.itemNo} colorId=${item.colorId} → inv.found=${inv.found} qty=${inv.quantity}`);
         if (inv.found) {
           if (inv.quantity >= item.quantityWanted) fullyOwned++;
           else partlyOwned++;
