@@ -41,8 +41,8 @@
       else if (params.has('M')) { itemType = 'MINIFIG'; itemNo = params.get('M'); }
       else if (params.has('G')) { itemType = 'GEAR'; itemNo = params.get('G'); }
       else if (params.has('B')) { itemType = 'BOOK'; itemNo = params.get('B'); }
-      if (params.has('idColor') || params.has('ColorID')) {
-        colorId = params.get('idColor') || params.get('ColorID');
+      if (params.has('idColor') || params.has('ColorID') || params.has('C')) {
+        colorId = params.get('idColor') || params.get('ColorID') || params.get('C');
       }
       return { itemType, itemNo, colorId };
     } catch (e) {
