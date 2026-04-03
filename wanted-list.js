@@ -114,7 +114,14 @@
       if (colorId != null) return item.color_id != null && item.color_id.toString() === colorId.toString();
       return true;
     });
-    if (matching.length === 0) return { found: false, quantity: 0 };
+    if (matching.length === 0) {
+      // Logga om itemNo hittas med annan färg, för att diagnostisera färgmismatch
+      const anyMatch = inventory.filter(item => item.item && item.item.no === itemNo);
+      if (anyMatch.length > 0) {
+        console.log(`[BL] ${itemNo} colorId=${colorId}: hittades INTE men finns med färger: ${anyMatch.map(i => i.color_id).join(', ')}`);
+      }
+      return { found: false, quantity: 0 };
+    }
     return { found: true, quantity: matching.reduce((s, i) => s + (i.quantity || 0), 0) };
   }
 
@@ -128,8 +135,9 @@
     matchedItems.forEach(item => {
       const links = document.querySelectorAll('a[href*="catalogitem.page"]');
       links.forEach(link => {
-        const { itemNo } = parseItemUrl(link.href);
+        const { itemNo, colorId } = parseItemUrl(link.href);
         if (itemNo !== item.itemNo) return;
+        if (item.colorId != null && colorId != null && colorId.toString() !== item.colorId.toString()) return;
 
         // Hoppa över om badge redan finns bredvid denna länk
         let sibling = link.nextSibling;
