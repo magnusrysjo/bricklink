@@ -394,10 +394,55 @@
     });
   }
 
+  function refreshPage() {
+    processing = false;
+    inventory = null;
+    matchedItems = [];
+    document.querySelectorAll('.bricklink-wanted-badge').forEach(b => b.remove());
+    document.querySelectorAll('[data-bl-styled]').forEach(el => {
+      el.style.removeProperty('background-color');
+      el.style.removeProperty('border-left');
+      delete el.dataset.blStyled;
+    });
+    const old = document.getElementById('bl-remove-btn-wrap');
+    if (old) old.remove();
+    processPage();
+  }
+
+  function showRefreshButton() {
+    const btn = document.createElement('button');
+    btn.id = 'bl-refresh-btn';
+    btn.title = 'Uppdatera BrickLink inventory-kontroll';
+    btn.textContent = '🔄';
+    btn.style.cssText = `
+      position: fixed !important;
+      bottom: 24px !important;
+      left: 24px !important;
+      z-index: 2147483647 !important;
+      background: white !important;
+      border: 2px solid #ddd !important;
+      border-radius: 50% !important;
+      width: 40px !important;
+      height: 40px !important;
+      font-size: 16px !important;
+      cursor: pointer !important;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+      padding: 0 !important;
+      line-height: 1 !important;
+    `;
+    btn.addEventListener('click', () => {
+      btn.textContent = '⏳';
+      btn.disabled = true;
+      refreshPage();
+      setTimeout(() => { btn.textContent = '🔄'; btn.disabled = false; }, 3000);
+    });
+    document.body.appendChild(btn);
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', processPage);
+    document.addEventListener('DOMContentLoaded', () => { processPage(); showRefreshButton(); });
   } else {
-    setTimeout(processPage, 1000);
+    setTimeout(() => { processPage(); showRefreshButton(); }, 1000);
   }
 
 })();
