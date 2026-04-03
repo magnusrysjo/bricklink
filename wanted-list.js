@@ -200,21 +200,18 @@
   function getHaveValue(item) {
     const links = document.querySelectorAll('a[href*="catalogitem.page"]');
     for (const link of links) {
-      const { itemNo } = parseItemUrl(link.href);
+      const { itemNo, colorId } = parseItemUrl(link.href);
       if (itemNo !== item.itemNo) continue;
+      if (item.colorId && colorId && colorId.toString() !== item.colorId.toString()) continue;
 
       let el = link.parentElement;
       for (let depth = 0; depth < 12 && el && el !== document.body; depth++) {
         const quantityCol = el.querySelector('.wl-col-quantity');
         if (quantityCol) {
-          console.log(`[BL] ${item.itemNo}: hittade .wl-col-quantity på djup ${depth}`);
-          console.log(`[BL] innerHTML:`, quantityCol.innerHTML);
           const haveSection = Array.from(quantityCol.querySelectorAll('.wl-hover-editable'))
             .find(div => div.textContent.includes('Have:'));
-          console.log(`[BL] haveSection:`, haveSection ? haveSection.innerHTML : 'null');
           if (haveSection) {
             const smallEl = haveSection.querySelector('small.text');
-            console.log(`[BL] smallEl:`, smallEl ? `"${smallEl.textContent}"` : 'null');
             if (smallEl) {
               const val = parseInt(smallEl.textContent.trim(), 10);
               return isNaN(val) ? 0 : val;
@@ -224,7 +221,6 @@
         }
         el = el.parentElement;
       }
-      console.log(`[BL] ${item.itemNo}: hittade ingen .wl-col-quantity inom 12 nivåer`);
     }
     return 0;
   }
