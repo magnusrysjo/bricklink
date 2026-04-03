@@ -270,12 +270,16 @@
 
       // Läs Have-fältets aktuella värde för varje item, begränsat av vad som faktiskt finns i inventory
       const payload = itemsToRemove
-        .map(item => ({
-          itemType: item.itemType,
-          itemNo: item.itemNo,
-          colorId: item.colorId,
-          quantityToRemove: Math.min(getHaveValue(item), item.quantityOwned)
-        }))
+        .map(item => {
+          const haveVal = getHaveValue(item);
+          console.log(`[BL] ${item.itemNo} colorId=${item.colorId} haveVal=${haveVal} owned=${item.quantityOwned}`);
+          return {
+            itemType: item.itemType,
+            itemNo: item.itemNo,
+            colorId: item.colorId,
+            quantityToRemove: Math.min(haveVal, item.quantityOwned)
+          };
+        })
         .filter(item => item.quantityToRemove > 0);
 
       if (payload.length === 0) {
