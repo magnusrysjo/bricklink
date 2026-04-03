@@ -147,6 +147,7 @@
           sibling = sibling.nextSibling;
         }
 
+        console.log(`[BL] injectBadge: ${item.itemNo} itemColorId=${item.colorId} linkColorId=${colorId} qty=${item.quantityOwned}`);
         const badge = document.createElement('span');
         badge.className = 'bricklink-wanted-badge';
         badge.style.cssText = `
