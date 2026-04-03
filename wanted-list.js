@@ -199,10 +199,16 @@
   // inuti .wl-col-quantity > .wl-hover-editable (den med "Have:"-text).
   function getHaveValue(item) {
     const links = document.querySelectorAll('a[href*="catalogitem.page"]');
+    let foundLink = false;
     for (const link of links) {
       const { itemNo, colorId } = parseItemUrl(link.href);
       if (itemNo !== item.itemNo) continue;
-      if (item.colorId && colorId && colorId.toString() !== item.colorId.toString()) continue;
+      if (item.colorId && colorId && colorId.toString() !== item.colorId.toString()) {
+        console.log(`[BL] getHaveValue: ${item.itemNo} – hoppar länk med colorId=${colorId} (söker ${item.colorId})`);
+        continue;
+      }
+      foundLink = true;
+      console.log(`[BL] getHaveValue: hittade länk ${item.itemNo} colorId=${colorId}`);
 
       let el = link.parentElement;
       for (let depth = 0; depth < 12 && el && el !== document.body; depth++) {
@@ -212,6 +218,7 @@
             .find(div => div.textContent.includes('Have:'));
           if (haveSection) {
             const smallEl = haveSection.querySelector('small.text');
+            console.log(`[BL] getHaveValue: haveSection innerHTML=${haveSection.innerHTML}`);
             if (smallEl) {
               const val = parseInt(smallEl.textContent.trim(), 10);
               return isNaN(val) ? 0 : val;
@@ -222,6 +229,7 @@
         el = el.parentElement;
       }
     }
+    if (!foundLink) console.log(`[BL] getHaveValue: hittade ingen länk för ${item.itemNo} colorId=${item.colorId}`);
     return 0;
   }
 
