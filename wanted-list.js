@@ -68,11 +68,13 @@
       let colorName = null;
       const rowText = row.textContent;
 
-      for (const color of Object.keys(COLOR_NAME_TO_ID)) {
-        if (new RegExp(`\\b${color}\\b`, 'i').test(rowText)) {
-          colorName = color;
-          colorId = COLOR_NAME_TO_ID[color];
-          break;
+      if (!colorId) {
+        for (const color of Object.keys(COLOR_NAME_TO_ID)) {
+          if (new RegExp(`\\b${color}\\b`, 'i').test(rowText)) {
+            colorName = color;
+            colorId = COLOR_NAME_TO_ID[color];
+            break;
+          }
         }
       }
 
