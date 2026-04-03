@@ -218,7 +218,6 @@ async function updateInventoryQuantities(items) {
       return true;
     });
 
-    console.log(`[BG] ${itemNo} colorId=${colorId} entries=${entries.length} cachelen=${inventoryCache.length}`);
     if (entries.length === 0) {
       console.log(`⚠️ Inga inventory-poster för ${itemType} ${itemNo} färg ${colorId}`);
       continue;

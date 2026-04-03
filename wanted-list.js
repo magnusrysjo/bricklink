@@ -114,14 +114,7 @@
       if (colorId != null) return item.color_id != null && item.color_id.toString() === colorId.toString();
       return true;
     });
-    if (matching.length === 0) {
-      // Logga om itemNo hittas med annan färg, för att diagnostisera färgmismatch
-      const anyMatch = inventory.filter(item => item.item && item.item.no === itemNo);
-      if (anyMatch.length > 0) {
-        console.log(`[BL] ${itemNo} colorId=${colorId}: hittades INTE men finns med färger: ${anyMatch.map(i => i.color_id).join(', ')}`);
-      }
-      return { found: false, quantity: 0 };
-    }
+    if (matching.length === 0) return { found: false, quantity: 0 };
     return { found: true, quantity: matching.reduce((s, i) => s + (i.quantity || 0), 0) };
   }
 
@@ -147,7 +140,6 @@
           sibling = sibling.nextSibling;
         }
 
-        console.log(`[BL] injectBadge: ${item.itemNo} itemColorId=${item.colorId} linkColorId=${colorId} qty=${item.quantityOwned}`);
         const badge = document.createElement('span');
         badge.className = 'bricklink-wanted-badge';
         badge.style.cssText = `
@@ -287,16 +279,12 @@
 
       // Läs Have-fältets aktuella värde för varje item, begränsat av vad som faktiskt finns i inventory
       const payload = itemsToRemove
-        .map(item => {
-          const haveVal = getHaveValue(item);
-          console.log(`[BL] ${item.itemNo} colorId=${item.colorId} haveVal=${haveVal} owned=${item.quantityOwned}`);
-          return {
-            itemType: item.itemType,
-            itemNo: item.itemNo,
-            colorId: item.colorId,
-            quantityToRemove: Math.min(haveVal, item.quantityOwned)
-          };
-        })
+        .map(item => ({
+          itemType: item.itemType,
+          itemNo: item.itemNo,
+          colorId: item.colorId,
+          quantityToRemove: Math.min(getHaveValue(item), item.quantityOwned)
+        }))
         .filter(item => item.quantityToRemove > 0);
 
       if (payload.length === 0) {
@@ -393,7 +381,6 @@
 
       items.forEach(item => {
         const inv = getItemInventory(item.itemType, item.itemNo, item.colorId);
-        console.log(`[BL] ${item.itemNo} colorId=${item.colorId} → inv.found=${inv.found} qty=${inv.quantity}`);
         if (inv.found) {
           if (inv.quantity >= item.quantityWanted) fullyOwned++;
           else partlyOwned++;
