@@ -1,4 +1,5 @@
 import os
+from collections import defaultdict
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from dotenv import load_dotenv
 import bricklink_api as bl
@@ -7,6 +8,31 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-change-me")
+
+
+TYPE_ORDER = ["PART", "SET", "MINIFIG", "BOOK", "GEAR", "CATALOG", "INSTRUCTION", "UNSORTED_LOT", "ORIGINAL_BOX"]
+
+
+def _group_inventory(inventory: list) -> dict:
+    """Returns {item_type: {category_name: [items]}} sorted alphabetically."""
+    result: dict[str, dict[str, list]] = defaultdict(lambda: defaultdict(list))
+    for item in inventory:
+        itype = item.get("item", {}).get("type", "ÖVRIGT")
+        cat = item.get("category_name", "Övrigt")
+        result[itype][cat].append(item)
+    # Sort each category's items by item number
+    for itype in result:
+        for cat in result[itype]:
+            result[itype][cat].sort(key=lambda x: x.get("item", {}).get("no", ""))
+    # Return ordered by TYPE_ORDER, then alphabetically for unknown types
+    ordered = {}
+    for t in TYPE_ORDER:
+        if t in result:
+            ordered[t] = dict(sorted(result[t].items()))
+    for t in sorted(result):
+        if t not in ordered:
+            ordered[t] = dict(sorted(result[t].items()))
+    return ordered
 
 
 def credentials_ok():
@@ -22,9 +48,12 @@ def index():
     try:
         item_type = request.args.get("item_type", "")
         inventory = bl.get_inventory(item_type or None)
-        return render_template("index.html", inventory=inventory, item_type=item_type, error=None)
+        bl.enrich_with_category_names(inventory)
+        grouped = _group_inventory(inventory)
+        return render_template("index.html", grouped=grouped, total=len(inventory),
+                               item_type=item_type, error=None)
     except Exception as e:
-        return render_template("index.html", inventory=[], error=str(e))
+        return render_template("index.html", grouped={}, total=0, item_type=item_type, error=str(e))
 
 
 @app.route("/item/<int:inventory_id>")

@@ -2,63 +2,115 @@
 {% block title %}Inventory – BrickLink{% endblock %}
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-3">
-  <h2 class="mb-0">Mitt inventory</h2>
+  <h2 class="mb-0">Mitt inventory <span class="text-muted fs-5 fw-normal">{{ total }} items</span></h2>
   <form class="d-flex gap-2" method="get">
-    <select name="item_type" class="form-select form-select-sm" style="width:auto">
+    <select name="item_type" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
       <option value="">Alla typer</option>
       {% for t in ["PART","SET","MINIFIG","BOOK","GEAR","CATALOG","INSTRUCTION","UNSORTED_LOT","ORIGINAL_BOX"] %}
         <option value="{{ t }}" {% if item_type == t %}selected{% endif %}>{{ t }}</option>
       {% endfor %}
     </select>
-    <button class="btn btn-sm btn-outline-secondary" type="submit">Filtrera</button>
   </form>
 </div>
 
 {% if error %}
   <div class="alert alert-danger">{{ error }}</div>
-{% elif not inventory %}
+{% elif not grouped %}
   <p class="text-muted">Inga items hittades.</p>
 {% else %}
-  <p class="text-muted">{{ inventory|length }} items</p>
-  <div class="table-responsive">
-    <table class="table table-hover align-middle bg-white rounded shadow-sm">
-      <thead class="table-light">
-        <tr>
-          <th>Item</th>
-          <th>Typ</th>
-          <th>Färg</th>
-          <th class="text-end">Antal</th>
-          <th class="text-end">Pris</th>
-          <th>Skick</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for inv in inventory %}
-        <tr>
-          <td>
-            <strong>{{ inv.item.no }}</strong><br>
-            <small class="text-muted">{{ inv.item.name }}</small>
-          </td>
-          <td><span class="badge bg-secondary">{{ inv.item.type }}</span></td>
-          <td>{{ inv.color_name or '–' }}</td>
-          <td class="text-end">{{ inv.quantity }}</td>
-          <td class="text-end">{{ inv.unit_price }} kr</td>
-          <td>
-            <span class="badge badge-{{ inv.new_or_used }}">{{ 'Ny' if inv.new_or_used == 'N' else 'Begagnad' }}</span>
-          </td>
-          <td class="text-end">
-            <a href="{{ url_for('edit_item', inventory_id=inv.inventory_id) }}"
-               class="btn btn-sm btn-outline-primary">Redigera</a>
-            <form method="post" action="{{ url_for('delete_item', inventory_id=inv.inventory_id) }}"
-                  class="d-inline" onsubmit="return confirm('Ta bort detta item?')">
-              <button type="submit" class="btn btn-sm btn-outline-danger">Ta bort</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+
+{# Tabs för item-typer #}
+{% set types = grouped.keys()|list %}
+<ul class="nav nav-tabs mb-3" id="typeTabs" role="tablist">
+  {% for itype in types %}
+  <li class="nav-item" role="presentation">
+    <button class="nav-link {% if loop.first %}active{% endif %}"
+            id="tab-{{ itype }}"
+            data-bs-toggle="tab"
+            data-bs-target="#pane-{{ itype }}"
+            type="button" role="tab">
+      {{ itype }}
+      <span class="badge bg-secondary ms-1">
+        {{ grouped[itype].values()|sum(attribute='__len__') }}
+      </span>
+    </button>
+  </li>
+  {% endfor %}
+</ul>
+
+<div class="tab-content" id="typeTabContent">
+  {% for itype, categories in grouped.items() %}
+  <div class="tab-pane fade {% if loop.first %}show active{% endif %}"
+       id="pane-{{ itype }}" role="tabpanel">
+
+    {# Accordion för kategorier inom typen #}
+    <div class="accordion" id="accordion-{{ itype }}">
+      {% for cat_name, items in categories.items() %}
+      {% set cat_id = (itype + '-' + cat_name)|replace(' ','_')|replace('/','_') %}
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button {% if not loop.first %}collapsed{% endif %}"
+                  type="button" data-bs-toggle="collapse"
+                  data-bs-target="#collapse-{{ cat_id }}">
+            {{ cat_name }}
+            <span class="badge bg-secondary ms-2">{{ items|length }}</span>
+          </button>
+        </h2>
+        <div id="collapse-{{ cat_id }}"
+             class="accordion-collapse collapse {% if loop.first %}show{% endif %}"
+             data-bs-parent="#accordion-{{ itype }}">
+          <div class="accordion-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Item</th>
+                    <th>Färg</th>
+                    <th class="text-end">Antal</th>
+                    <th class="text-end">Pris</th>
+                    <th>Skick</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for inv in items %}
+                  <tr>
+                    <td>
+                      <strong>{{ inv.item.no }}</strong><br>
+                      <small class="text-muted">{{ inv.item.name }}</small>
+                    </td>
+                    <td>{{ inv.color_name or '–' }}</td>
+                    <td class="text-end">{{ inv.quantity }}</td>
+                    <td class="text-end">{{ inv.unit_price }}</td>
+                    <td>
+                      {% if inv.new_or_used == 'N' %}
+                        <span class="badge bg-success">Ny</span>
+                      {% else %}
+                        <span class="badge bg-secondary">Begagnad</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end">
+                      <a href="{{ url_for('edit_item', inventory_id=inv.inventory_id) }}"
+                         class="btn btn-sm btn-outline-primary">Redigera</a>
+                      <form method="post" action="{{ url_for('delete_item', inventory_id=inv.inventory_id) }}"
+                            class="d-inline" onsubmit="return confirm('Ta bort detta item?')">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Ta bort</button>
+                      </form>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
   </div>
+  {% endfor %}
+</div>
+
 {% endif %}
 {% endblock %}

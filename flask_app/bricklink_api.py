@@ -1,6 +1,8 @@
 import os
 from requests_oauthlib import OAuth1Session
 
+_category_cache: dict[int, str] = {}
+
 
 def get_session():
     return OAuth1Session(
@@ -13,6 +15,30 @@ def get_session():
 
 
 BASE_URL = "https://api.bricklink.com/api/store/v1"
+
+
+def get_category_name(category_id: int) -> str:
+    if category_id in _category_cache:
+        return _category_cache[category_id]
+    try:
+        session = get_session()
+        resp = session.get(f"{BASE_URL}/categories/{category_id}")
+        resp.raise_for_status()
+        name = resp.json().get("data", {}).get("category_name", f"Kategori {category_id}")
+    except Exception:
+        name = f"Kategori {category_id}"
+    _category_cache[category_id] = name
+    return name
+
+
+def enrich_with_category_names(inventory: list) -> None:
+    """Adds category_name field in-place for each item that has category_id."""
+    unique_ids = {item.get("item", {}).get("category_id") for item in inventory} - {None, 0}
+    for cid in unique_ids:
+        get_category_name(cid)
+    for item in inventory:
+        cid = item.get("item", {}).get("category_id", 0)
+        item["category_name"] = _category_cache.get(cid, "Övrigt")
 
 
 def get_inventory(item_type=None):
