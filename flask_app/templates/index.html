@@ -38,6 +38,38 @@
   <p class="text-muted">Inga items hittades.</p>
 {% else %}
 
+{# Lägg till artikel #}
+<div class="add-article-section card mb-3 p-3 shadow-sm">
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    <strong style="white-space:nowrap">+ Lägg till artikel</strong>
+    <select class="form-select form-select-sm new-item-type" style="max-width:120px">
+      {% for t in ["PART","SET","MINIFIG","BOOK","GEAR","CATALOG","INSTRUCTION","UNSORTED_LOT","ORIGINAL_BOX"] %}
+        <option value="{{ t }}">{{ t }}</option>
+      {% endfor %}
+    </select>
+    <input type="text" class="form-control form-control-sm new-item-no" placeholder="Artikelnummer, t.ex. 3001" style="max-width:200px">
+    <button class="btn btn-sm btn-outline-secondary search-item-btn">Sök</button>
+    <span class="item-lookup-status text-muted" style="font-size:0.85rem"></span>
+  </div>
+  <div class="add-article-fields mt-2" style="display:none">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span class="found-item-name fw-bold text-success" style="min-width:180px"></span>
+      <select class="form-select form-select-sm new-article-color" style="max-width:180px">
+        <option value="">Välj färg…</option>
+      </select>
+      <input type="number" class="form-control form-control-sm new-article-qty" value="1" min="1" style="max-width:80px; display:none">
+      <input type="text" class="form-control form-control-sm new-article-price" placeholder="Pris" style="max-width:90px; display:none">
+      <select class="form-select form-select-sm new-article-condition" style="max-width:110px; display:none">
+        <option value="N">Ny</option>
+        <option value="U">Begagnad</option>
+      </select>
+      <input type="text" class="form-control form-control-sm new-article-remarks" placeholder="Anmärkning" style="max-width:130px; display:none">
+      <button class="btn btn-sm btn-success save-new-article" style="display:none">Spara</button>
+      <span class="new-article-status" style="font-size:0.85rem"></span>
+    </div>
+  </div>
+</div>
+
 <ul class="nav nav-tabs mb-3" id="typeTabs" role="tablist">
   {% for itype, categories in grouped.items() %}
   <li class="nav-item" role="presentation">
@@ -198,33 +230,6 @@
               </tbody>
             </table>
 
-            {# Lägg till artikel #}
-            <div class="add-article-section p-3 border-top" data-item-type="{{ itype }}">
-              <div class="d-flex align-items-center gap-2 flex-wrap">
-                <strong style="white-space:nowrap">+ Lägg till artikel</strong>
-                <input type="text" class="form-control form-control-sm new-item-no" placeholder="Artikelnummer, t.ex. 3001" style="max-width:200px">
-                <button class="btn btn-sm btn-outline-secondary search-item-btn">Sök</button>
-                <span class="item-lookup-status text-muted" style="font-size:0.85rem"></span>
-              </div>
-              <div class="add-article-fields mt-2" style="display:none">
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                  <span class="found-item-name fw-bold text-success" style="min-width:180px"></span>
-                  <select class="form-select form-select-sm new-article-color" style="max-width:180px">
-                    <option value="">Välj färg…</option>
-                  </select>
-                  <input type="number" class="form-control form-control-sm new-article-qty" value="1" min="1" style="max-width:80px; display:none">
-                  <input type="text" class="form-control form-control-sm new-article-price" placeholder="Pris" style="max-width:90px; display:none">
-                  <select class="form-select form-select-sm new-article-condition" style="max-width:110px; display:none">
-                    <option value="N">Ny</option>
-                    <option value="U">Begagnad</option>
-                  </select>
-                  <input type="text" class="form-control form-control-sm new-article-remarks" placeholder="Anmärkning" style="max-width:130px; display:none">
-                  <button class="btn btn-sm btn-success save-new-article" style="display:none">Spara</button>
-                  <span class="new-article-status" style="font-size:0.85rem"></span>
-                </div>
-              </div>
-            </div>
-
           </div>
         </div>
       </div>
@@ -316,7 +321,7 @@ document.addEventListener('show.bs.collapse', (e) => {
 // Artikelsökning — sök-knapp eller Enter
 async function searchItem(section) {
   const itemNo = section.querySelector('.new-item-no').value.trim();
-  const itemType = section.dataset.itemType;
+  const itemType = section.querySelector('.new-item-type').value;
   const status = section.querySelector('.item-lookup-status');
   const fields = section.querySelector('.add-article-fields');
   if (!itemNo) return;
@@ -385,7 +390,7 @@ document.addEventListener('change', async (e) => {
   if (!remarksInput.value) remarksInput.value = new Date().toISOString().slice(0, 10);
 
   const itemNo = section.dataset.foundItemNo;
-  const itemType = section.dataset.itemType;
+  const itemType = section.querySelector('.new-item-type').value;
   const colorId = colorSel.value;
   const condition = section.querySelector('.new-article-condition').value;
 
@@ -408,7 +413,7 @@ document.addEventListener('click', async (e) => {
   const status = section.querySelector('.new-article-status');
   const body = {
     item_no: section.dataset.foundItemNo,
-    item_type: section.dataset.itemType,
+    item_type: section.querySelector('.new-item-type').value,
     color_id: section.querySelector('.new-article-color').value,
     quantity: section.querySelector('.new-article-qty').value,
     unit_price: section.querySelector('.new-article-price').value,
