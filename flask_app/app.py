@@ -160,5 +160,5 @@ def api_delete_item(inventory_id):
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 5050))
     app.run(debug=True, port=port)
