@@ -322,11 +322,6 @@ document.addEventListener('show.bs.collapse', (e) => {
 async function searchItem(section) {
   const itemType = section.querySelector('.new-item-type').value;
   let itemNo = section.querySelector('.new-item-no').value.trim();
-  const suffixTypes = ['SET', 'BOOK', 'GEAR', 'CATALOG', 'INSTRUCTION', 'ORIGINAL_BOX'];
-  if (suffixTypes.includes(itemType) && itemNo && !itemNo.includes('-')) {
-    itemNo += '-1';
-    section.querySelector('.new-item-no').value = itemNo;
-  }
   const status = section.querySelector('.item-lookup-status');
   const fields = section.querySelector('.add-article-fields');
   if (!itemNo) return;
@@ -335,8 +330,17 @@ async function searchItem(section) {
   fields.style.display = 'none';
 
   try {
-    const resp = await fetch(`/api/item/${itemType}/${encodeURIComponent(itemNo)}`);
-    const data = await resp.json();
+    let resp = await fetch(`/api/item/${itemType}/${encodeURIComponent(itemNo)}`);
+    let data = await resp.json();
+    if ((data.error || !data.name) && !itemNo.includes('-')) {
+      const retry = itemNo + '-1';
+      resp = await fetch(`/api/item/${itemType}/${encodeURIComponent(retry)}`);
+      data = await resp.json();
+      if (!data.error && data.name) {
+        itemNo = retry;
+        section.querySelector('.new-item-no').value = itemNo;
+      }
+    }
     if (data.error || !data.name) throw new Error(data.error || 'Hittades inte');
     status.textContent = '';
     section.querySelector('.found-item-name').textContent = data.name;
