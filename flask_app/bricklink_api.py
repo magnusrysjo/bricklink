@@ -2,6 +2,7 @@ import os
 from requests_oauthlib import OAuth1Session
 
 _category_cache: dict[int, str] = {}
+_categories_loaded = False
 
 
 def get_session():
@@ -17,25 +18,24 @@ def get_session():
 BASE_URL = "https://api.bricklink.com/api/store/v1"
 
 
-def get_category_name(category_id: int) -> str:
-    if category_id in _category_cache:
-        return _category_cache[category_id]
+def _load_all_categories():
+    global _categories_loaded
+    if _categories_loaded:
+        return
     try:
         session = get_session()
-        resp = session.get(f"{BASE_URL}/categories/{category_id}")
+        resp = session.get(f"{BASE_URL}/categories")
         resp.raise_for_status()
-        name = resp.json().get("data", {}).get("category_name", f"Kategori {category_id}")
+        for cat in resp.json().get("data", []):
+            _category_cache[cat["category_id"]] = cat["category_name"]
     except Exception:
-        name = f"Kategori {category_id}"
-    _category_cache[category_id] = name
-    return name
+        pass
+    _categories_loaded = True
 
 
 def enrich_with_category_names(inventory: list) -> None:
-    """Adds category_name field in-place for each item that has category_id."""
-    unique_ids = {item.get("item", {}).get("category_id") for item in inventory} - {None, 0}
-    for cid in unique_ids:
-        get_category_name(cid)
+    """Adds category_name field in-place. Fetches all categories in one API call."""
+    _load_all_categories()
     for item in inventory:
         cid = item.get("item", {}).get("category_id", 0)
         item["category_name"] = _category_cache.get(cid, "Övrigt")
