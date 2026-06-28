@@ -16,10 +16,9 @@
   {% else %}
     {% set src = "https://img.bricklink.com/ItemImage/P" ~ cond ~ "/" ~ color_id ~ "/" ~ item_no ~ ".png" %}
   {% endif %}
-  <img src="{{ src }}" alt="{{ item_no }}" width="48" height="48"
+  <img src="{{ src }}" alt="{{ item_no }}" title="{{ src }}" width="48" height="48"
        style="object-fit:contain"
-       referrerpolicy="no-referrer"
-       onerror="this.style.visibility='hidden'">
+       referrerpolicy="no-referrer">
 {% endmacro %}
 
 {% block content %}
