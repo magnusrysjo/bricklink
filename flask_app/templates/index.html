@@ -113,6 +113,8 @@
         <div id="collapse-{{ itype }}-{{ loop.index }}"
              class="accordion-collapse collapse {% if loop.first %}show{% endif %}">
           <div class="accordion-body p-0">
+            {% if itype == "PART" %}
+            {# DELAR: expanderbar per artikel, färgrader inuti #}
             <table class="table table-hover align-middle mb-0">
               <thead class="table-light">
                 <tr>
@@ -130,18 +132,14 @@
                 {% set row_id = "row-" ~ ns.row %}
                 <tr class="table-row-item" style="cursor:pointer"
                     data-bs-toggle="collapse" data-bs-target="#{{ row_id }}">
-                  <td class="text-center">
-                    {{ item_img(item_no, itype, first.color_id or 0) }}
-                  </td>
+                  <td class="text-center">{{ item_img(item_no, itype, first.color_id or 0) }}</td>
                   <td>
                     <strong>{{ item_no }}</strong><br>
                     <small class="text-muted">{{ first.item.name }}</small>
                   </td>
                   <td class="text-end fw-bold">{{ total_qty }}</td>
                   <td class="text-center text-muted">
-                    {% if entries|length > 1 %}
-                      <span class="expand-icon">▸</span>
-                    {% endif %}
+                    {% if entries|length > 1 %}<span class="expand-icon">▸</span>{% endif %}
                   </td>
                 </tr>
                 <tr class="p-0">
@@ -162,33 +160,20 @@
                         <tbody>
                           {% for inv in entries %}
                           <tr data-inv-id="{{ inv.inventory_id }}">
-                            <td class="text-center">
-                              {{ item_img(item_no, itype, inv.color_id or 0) }}
-                            </td>
+                            <td class="text-center">{{ item_img(item_no, itype, inv.color_id or 0) }}</td>
                             <td>{{ inv.color_name or '–' }}</td>
-                            <td>
-                              <input type="number" class="form-control form-control-sm inv-field"
-                                     data-field="quantity" value="{{ inv.quantity }}" min="0">
-                            </td>
-                            <td>
-                              <input type="text" class="form-control form-control-sm inv-field"
-                                     data-field="unit_price" value="{{ inv.unit_price }}">
-                            </td>
+                            <td><input type="number" class="form-control form-control-sm inv-field" data-field="quantity" value="{{ inv.quantity }}" min="0"></td>
+                            <td><input type="text" class="form-control form-control-sm inv-field" data-field="unit_price" value="{{ inv.unit_price }}"></td>
                             <td>
                               <select class="form-select form-select-sm inv-field" data-field="new_or_used">
                                 <option value="N" {% if inv.new_or_used == 'N' %}selected{% endif %}>Ny</option>
                                 <option value="U" {% if inv.new_or_used == 'U' %}selected{% endif %}>Begagnad</option>
                               </select>
                             </td>
-                            <td>
-                              <input type="text" class="form-control form-control-sm inv-field"
-                                     data-field="remarks" value="{{ inv.remarks or '' }}"
-                                     placeholder="–">
-                            </td>
+                            <td><input type="text" class="form-control form-control-sm inv-field" data-field="remarks" value="{{ inv.remarks or '' }}" placeholder="–"></td>
                             <td class="text-end">
                               <span class="save-indicator me-1" style="font-size:0.8rem"></span>
-                              <form method="post" action="{{ url_for('delete_item', inventory_id=inv.inventory_id) }}"
-                                    class="d-inline" onsubmit="return confirm('Ta bort?')">
+                              <form method="post" action="{{ url_for('delete_item', inventory_id=inv.inventory_id) }}" class="d-inline" onsubmit="return confirm('Ta bort?')">
                                 <button type="submit" class="btn btn-sm btn-outline-danger">✕</button>
                               </form>
                             </td>
@@ -201,21 +186,15 @@
                                 <option value="">+ Välj färg…</option>
                               </select>
                             </td>
-                            <td>
-                              <input type="number" class="form-control form-control-sm new-qty" value="1" min="1" style="display:none">
-                            </td>
-                            <td>
-                              <input type="text" class="form-control form-control-sm new-price" placeholder="Pris" style="display:none">
-                            </td>
+                            <td><input type="number" class="form-control form-control-sm new-qty" value="1" min="1" style="display:none"></td>
+                            <td><input type="text" class="form-control form-control-sm new-price" placeholder="Pris" style="display:none"></td>
                             <td>
                               <select class="form-select form-select-sm new-condition" style="display:none">
                                 <option value="N">Ny</option>
                                 <option value="U" selected>Begagnad</option>
                               </select>
                             </td>
-                            <td>
-                              <input type="text" class="form-control form-control-sm new-remarks" placeholder="Anmärkning" style="display:none">
-                            </td>
+                            <td><input type="text" class="form-control form-control-sm new-remarks" placeholder="Anmärkning" style="display:none"></td>
                             <td class="text-end">
                               <button class="btn btn-sm btn-success save-new-color" style="display:none">Spara</button>
                               <span class="new-color-status" style="font-size:0.8rem"></span>
@@ -229,6 +208,61 @@
                 {% endfor %}
               </tbody>
             </table>
+
+            {% else %}
+            {# SET, MINIFIG m.fl.: platt tabell utan färggruppering #}
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:56px"></th>
+                  <th>Artikel</th>
+                  <th style="width:90px">Antal</th>
+                  <th style="width:100px">Pris</th>
+                  <th style="width:110px">Skick</th>
+                  <th>Anmärkning</th>
+                  <th style="width:80px"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item_no, entries in items_by_no.items() %}
+                {% for inv in entries %}
+                <tr data-inv-id="{{ inv.inventory_id }}">
+                  <td class="text-center">{{ item_img(item_no, itype, 0) }}</td>
+                  <td>
+                    <strong>{{ item_no }}</strong><br>
+                    <small class="text-muted">{{ inv.item.name }}</small>
+                  </td>
+                  <td>
+                    <input type="number" class="form-control form-control-sm inv-field"
+                           data-field="quantity" value="{{ inv.quantity }}" min="0">
+                  </td>
+                  <td>
+                    <input type="text" class="form-control form-control-sm inv-field"
+                           data-field="unit_price" value="{{ inv.unit_price }}">
+                  </td>
+                  <td>
+                    <select class="form-select form-select-sm inv-field" data-field="new_or_used">
+                      <option value="N" {% if inv.new_or_used == 'N' %}selected{% endif %}>Ny</option>
+                      <option value="U" {% if inv.new_or_used == 'U' %}selected{% endif %}>Begagnad</option>
+                    </select>
+                  </td>
+                  <td>
+                    <input type="text" class="form-control form-control-sm inv-field"
+                           data-field="remarks" value="{{ inv.remarks or '' }}" placeholder="–">
+                  </td>
+                  <td class="text-end">
+                    <span class="save-indicator me-1" style="font-size:0.8rem"></span>
+                    <form method="post" action="{{ url_for('delete_item', inventory_id=inv.inventory_id) }}"
+                          class="d-inline" onsubmit="return confirm('Ta bort?')">
+                      <button type="submit" class="btn btn-sm btn-outline-danger">✕</button>
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+                {% endfor %}
+              </tbody>
+            </table>
+            {% endif %}
 
           </div>
         </div>
