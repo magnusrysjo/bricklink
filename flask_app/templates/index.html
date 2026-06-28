@@ -31,7 +31,7 @@
             type="button" role="tab">
       {{ itype }}
       <span class="badge bg-secondary ms-1">
-        {{ grouped[itype].values()|sum(attribute='__len__') }}
+        {{ grouped[itype].values()|map('length')|sum }}
       </span>
     </button>
   </li>
