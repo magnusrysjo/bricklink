@@ -61,6 +61,7 @@
   {% endfor %}
 </ul>
 
+{% set ns = namespace(row=0) %}
 <div class="tab-content" id="typeTabContent">
   {% for itype, categories in grouped.items() %}
   <div class="tab-pane fade {% if loop.first %}show active{% endif %}"
@@ -91,9 +92,10 @@
               </thead>
               <tbody>
                 {% for item_no, entries in items_by_no.items() %}
+                {% set ns.row = ns.row + 1 %}
                 {% set total_qty = entries|sum(attribute='quantity') %}
                 {% set first = entries[0] %}
-                {% set row_id = "row-" ~ itype ~ "-" ~ loop.index %}
+                {% set row_id = "row-" ~ ns.row %}
                 <tr class="table-row-item" style="cursor:pointer"
                     data-bs-toggle="collapse" data-bs-target="#{{ row_id }}">
                   <td class="text-center">
