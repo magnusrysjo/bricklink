@@ -1,4 +1,5 @@
 import os
+import html
 from requests_oauthlib import OAuth1Session
 
 _category_cache: dict[int, str] = {}
@@ -77,6 +78,15 @@ def get_colors():
     return _colors_cache
 
 
+def _unescape_item(entry):
+    if "item" in entry:
+        entry["item"]["name"] = html.unescape(entry["item"].get("name", ""))
+    for field in ("color_name", "description", "remarks"):
+        if field in entry:
+            entry[field] = html.unescape(entry[field] or "")
+    return entry
+
+
 def get_inventory(item_type=None):
     session = get_session()
     params = {}
@@ -84,7 +94,7 @@ def get_inventory(item_type=None):
         params["item_type"] = item_type
     resp = session.get(f"{BASE_URL}/inventories", params=params)
     resp.raise_for_status()
-    return resp.json().get("data", [])
+    return [_unescape_item(e) for e in resp.json().get("data", [])]
 
 
 def get_inventory_item(inventory_id):
