@@ -1,5 +1,16 @@
 {% extends "base.html" %}
 {% block title %}Inventory – BrickLink{% endblock %}
+
+{% macro item_img(item_no, item_type, color_id) %}
+  {% set type_map = {"PART":"P","SET":"S","MINIFIG":"M","BOOK":"B","GEAR":"G","CATALOG":"C","INSTRUCTION":"I"} %}
+  {% set code = type_map.get(item_type, "P") %}
+  {% set cid = color_id if item_type == "PART" else 0 %}
+  <img src="https://img.bricklink.com/ItemImage/{{ code }}L/{{ cid }}/{{ item_no }}.png"
+       alt="{{ item_no }}" width="48" height="48"
+       style="object-fit:contain"
+       onerror="this.style.visibility='hidden'">
+{% endmacro %}
+
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-3">
   <h2 class="mb-0">Mitt inventory <span class="text-muted fs-5 fw-normal">{{ total }} items</span></h2>
@@ -64,6 +75,7 @@
               <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
                   <tr>
+                    <th></th>
                     <th>Item</th>
                     <th>Färg</th>
                     <th class="text-end">Antal</th>
@@ -75,6 +87,9 @@
                 <tbody>
                   {% for inv in items %}
                   <tr>
+                    <td class="text-center" style="width:60px">
+                      {{ item_img(inv.item.no, inv.item.type, inv.color_id or 0) }}
+                    </td>
                     <td>
                       <strong>{{ inv.item.no }}</strong><br>
                       <small class="text-muted">{{ inv.item.name }}</small>
