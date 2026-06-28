@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Nytt item – BrickLink{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h4 class="card-title">Lägg till nytt item</h4>
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label">Item-nummer <span class="text-danger">*</span></label>
+            <input type="text" name="item_no" class="form-control" placeholder="t.ex. 3001" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Typ <span class="text-danger">*</span></label>
+            <select name="item_type" class="form-select" required>
+              {% for t in ["PART","SET","MINIFIG","BOOK","GEAR","CATALOG","INSTRUCTION","UNSORTED_LOT","ORIGINAL_BOX"] %}
+                <option value="{{ t }}">{{ t }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Färg-ID <span class="text-danger">*</span></label>
+            <input type="number" name="color_id" class="form-control" placeholder="t.ex. 11 (Black)" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Antal <span class="text-danger">*</span></label>
+            <input type="number" name="quantity" class="form-control" min="1" value="1" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Pris per styck <span class="text-danger">*</span></label>
+            <input type="text" name="unit_price" class="form-control" placeholder="0.05" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Skick</label>
+            <select name="condition" class="form-select">
+              <option value="N">Ny (N)</option>
+              <option value="U">Begagnad (U)</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Beskrivning</label>
+            <input type="text" name="description" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Anmärkning (remarks)</label>
+            <input type="text" name="remarks" class="form-control">
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-danger">Lägg till</button>
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">Avbryt</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

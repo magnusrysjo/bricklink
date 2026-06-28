@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ item.item.no }} – BrickLink{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h4 class="card-title">{{ item.item.no }} – {{ item.item.name }}</h4>
+        <table class="table table-sm">
+          <tr><th>Typ</th><td>{{ item.item.type }}</td></tr>
+          <tr><th>Färg</th><td>{{ item.color_name }}</td></tr>
+          <tr><th>Antal</th><td>{{ item.quantity }}</td></tr>
+          <tr><th>Pris</th><td>{{ item.unit_price }}</td></tr>
+          <tr><th>Skick</th><td>{{ 'Ny' if item.new_or_used == 'N' else 'Begagnad' }}</td></tr>
+          <tr><th>Beskrivning</th><td>{{ item.description or '–' }}</td></tr>
+          <tr><th>Remarks</th><td>{{ item.remarks or '–' }}</td></tr>
+        </table>
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('edit_item', inventory_id=item.inventory_id) }}" class="btn btn-primary">Redigera</a>
+          <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">Tillbaka</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

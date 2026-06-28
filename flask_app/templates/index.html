@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Inventory – BrickLink{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h2 class="mb-0">Mitt inventory</h2>
+  <form class="d-flex gap-2" method="get">
+    <select name="item_type" class="form-select form-select-sm" style="width:auto">
+      <option value="">Alla typer</option>
+      {% for t in ["PART","SET","MINIFIG","BOOK","GEAR","CATALOG","INSTRUCTION","UNSORTED_LOT","ORIGINAL_BOX"] %}
+        <option value="{{ t }}" {% if item_type == t %}selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-sm btn-outline-secondary" type="submit">Filtrera</button>
+  </form>
+</div>
+
+{% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+{% elif not inventory %}
+  <p class="text-muted">Inga items hittades.</p>
+{% else %}
+  <p class="text-muted">{{ inventory|length }} items</p>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle bg-white rounded shadow-sm">
+      <thead class="table-light">
+        <tr>
+          <th>Item</th>
+          <th>Typ</th>
+          <th>Färg</th>
+          <th class="text-end">Antal</th>
+          <th class="text-end">Pris</th>
+          <th>Skick</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inv in inventory %}
+        <tr>
+          <td>
+            <strong>{{ inv.item.no }}</strong><br>
+            <small class="text-muted">{{ inv.item.name }}</small>
+          </td>
+          <td><span class="badge bg-secondary">{{ inv.item.type }}</span></td>
+          <td>{{ inv.color_name or '–' }}</td>
+          <td class="text-end">{{ inv.quantity }}</td>
+          <td class="text-end">{{ inv.unit_price }} kr</td>
+          <td>
+            <span class="badge badge-{{ inv.new_or_used }}">{{ 'Ny' if inv.new_or_used == 'N' else 'Begagnad' }}</span>
+          </td>
+          <td class="text-end">
+            <a href="{{ url_for('edit_item', inventory_id=inv.inventory_id) }}"
+               class="btn btn-sm btn-outline-primary">Redigera</a>
+            <form method="post" action="{{ url_for('delete_item', inventory_id=inv.inventory_id) }}"
+                  class="d-inline" onsubmit="return confirm('Ta bort detta item?')">
+              <button type="submit" class="btn btn-sm btn-outline-danger">Ta bort</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+{% endblock %}
