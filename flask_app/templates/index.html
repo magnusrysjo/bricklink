@@ -259,6 +259,11 @@ document.addEventListener('change', async (e) => {
   const itemNo = row.dataset.itemNo;
   const itemType = row.dataset.itemType;
 
+  const remarksInput = row.querySelector('.new-remarks');
+  if (!remarksInput.value) {
+    remarksInput.value = new Date().toISOString().slice(0, 10);
+  }
+
   priceInput.placeholder = 'Hämtar pris…';
   priceInput.value = '';
   try {
