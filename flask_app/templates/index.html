@@ -1,19 +1,20 @@
 {% extends "base.html" %}
 {% block title %}Inventory – BrickLink{% endblock %}
 
-{% macro item_img(item_no, item_type, color_id) %}
+{% macro item_img(item_no, item_type, color_id, condition="N") %}
+  {% set cond = "N" if condition == "N" else "U" %}
   {% if item_type == "PART" %}
-    {% set src = "https://img.bricklink.com/P/" ~ color_id ~ "/" ~ item_no ~ ".jpg" %}
+    {% set src = "https://img.bricklink.com/ItemImage/P" ~ cond ~ "/" ~ color_id ~ "/" ~ item_no ~ ".png" %}
   {% elif item_type == "MINIFIG" %}
-    {% set src = "https://img.bricklink.com/M/" ~ item_no ~ ".jpg" %}
+    {% set src = "https://img.bricklink.com/ItemImage/M" ~ cond ~ "/0/" ~ item_no ~ ".png" %}
   {% elif item_type == "SET" %}
-    {% set src = "https://img.bricklink.com/S/" ~ item_no ~ ".gif" %}
+    {% set src = "https://img.bricklink.com/ItemImage/S" ~ cond ~ "/0/" ~ item_no ~ ".png" %}
   {% elif item_type == "GEAR" %}
-    {% set src = "https://img.bricklink.com/G/" ~ item_no ~ ".jpg" %}
+    {% set src = "https://img.bricklink.com/ItemImage/G" ~ cond ~ "/0/" ~ item_no ~ ".png" %}
   {% elif item_type == "BOOK" %}
-    {% set src = "https://img.bricklink.com/B/" ~ item_no ~ ".jpg" %}
+    {% set src = "https://img.bricklink.com/ItemImage/B" ~ cond ~ "/0/" ~ item_no ~ ".png" %}
   {% else %}
-    {% set src = "https://img.bricklink.com/P/" ~ color_id ~ "/" ~ item_no ~ ".jpg" %}
+    {% set src = "https://img.bricklink.com/ItemImage/P" ~ cond ~ "/" ~ color_id ~ "/" ~ item_no ~ ".png" %}
   {% endif %}
   <img src="{{ src }}" alt="{{ item_no }}" width="48" height="48"
        style="object-fit:contain"
@@ -98,7 +99,7 @@
                   {% for inv in items %}
                   <tr>
                     <td class="text-center" style="width:60px">
-                      {{ item_img(inv.item.no, inv.item.type, inv.color_id or 0) }}
+                      {{ item_img(inv.item.no, inv.item.type, inv.color_id or 0, inv.new_or_used or 'N') }}
                     </td>
                     <td>
                       <strong>{{ inv.item.no }}</strong><br>
