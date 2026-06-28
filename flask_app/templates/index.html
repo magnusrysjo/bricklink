@@ -344,21 +344,45 @@ async function searchItem(section) {
     if (data.error || !data.name) throw new Error(data.error || 'Hittades inte');
     status.textContent = '';
     section.querySelector('.found-item-name').textContent = data.name;
-    // Sätt artikelnummer på sektionen för att kunna spara
     section.dataset.foundItemNo = data.no || itemNo;
-    // Fyll färg-dropdown om den är tom
-    const colorSel = section.querySelector('.new-article-color');
-    if (colorSel.options.length <= 1) {
-      const cr = await fetch('/api/colors');
-      const colors = await cr.json();
-      colors.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.color_id;
-        opt.textContent = `${c.color_name} (${c.color_id})`;
-        colorSel.appendChild(opt);
-      });
-    }
     fields.style.display = '';
+
+    const colorSel = section.querySelector('.new-article-color');
+    const needsColor = itemType === 'PART';
+
+    if (needsColor) {
+      colorSel.style.display = '';
+      if (colorSel.options.length <= 1) {
+        const cr = await fetch('/api/colors');
+        const colors = await cr.json();
+        colors.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.color_id;
+          opt.textContent = `${c.color_name} (${c.color_id})`;
+          colorSel.appendChild(opt);
+        });
+      }
+    } else {
+      colorSel.style.display = 'none';
+      section.dataset.foundColorId = '0';
+      // Visa fält och hämta pris direkt
+      const condition = section.querySelector('.new-article-condition').value;
+      section.querySelector('.new-article-qty').style.display = '';
+      section.querySelector('.new-article-price').style.display = '';
+      section.querySelector('.new-article-condition').style.display = '';
+      section.querySelector('.new-article-remarks').style.display = '';
+      section.querySelector('.save-new-article').style.display = '';
+      const remarksInput = section.querySelector('.new-article-remarks');
+      if (!remarksInput.value) remarksInput.value = new Date().toISOString().slice(0, 10);
+      const priceInput = section.querySelector('.new-article-price');
+      priceInput.placeholder = 'Hämtar pris…';
+      try {
+        const pr = await fetch(`/api/price_guide/${itemType}/${encodeURIComponent(itemNo)}?color_id=0&condition=${condition}`);
+        const pd = await pr.json();
+        priceInput.value = pd.avg_price ? parseFloat(pd.avg_price).toFixed(3) : '';
+        priceInput.placeholder = pd.avg_price ? 'Pris' : 'Inget pris hittades';
+      } catch { priceInput.placeholder = 'Kunde inte hämta pris'; }
+    }
   } catch(err) {
     status.textContent = `Hittades inte: ${err.message}`;
     status.style.color = '#dc3545';
@@ -400,7 +424,7 @@ document.addEventListener('change', async (e) => {
 
   const itemNo = section.dataset.foundItemNo;
   const itemType = section.querySelector('.new-item-type').value;
-  const colorId = colorSel.value;
+  const colorId = section.dataset.foundColorId || colorSel.value;
   const condition = section.querySelector('.new-article-condition').value;
 
   priceInput.placeholder = 'Hämtar pris…';
@@ -423,7 +447,7 @@ document.addEventListener('click', async (e) => {
   const body = {
     item_no: section.dataset.foundItemNo,
     item_type: section.querySelector('.new-item-type').value,
-    color_id: section.querySelector('.new-article-color').value,
+    color_id: section.dataset.foundColorId || section.querySelector('.new-article-color').value,
     quantity: section.querySelector('.new-article-qty').value,
     unit_price: section.querySelector('.new-article-price').value,
     condition: section.querySelector('.new-article-condition').value,
