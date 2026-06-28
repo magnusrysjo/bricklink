@@ -65,17 +65,17 @@
     {# Accordion för kategorier inom typen #}
     <div class="accordion" id="accordion-{{ itype }}">
       {% for cat_name, items in categories.items() %}
-      {% set cat_id = (itype + '-' + cat_name)|replace(' ','_')|replace('/','_') %}
+      {% set cat_id = loop.index %}
       <div class="accordion-item">
         <h2 class="accordion-header">
           <button class="accordion-button {% if not loop.first %}collapsed{% endif %}"
                   type="button" data-bs-toggle="collapse"
-                  data-bs-target="#collapse-{{ cat_id }}">
+                  data-bs-target="#collapse-{{ itype }}-{{ cat_id }}">
             {{ cat_name }}
             <span class="badge bg-secondary ms-2">{{ items|length }}</span>
           </button>
         </h2>
-        <div id="collapse-{{ cat_id }}"
+        <div id="collapse-{{ itype }}-{{ cat_id }}"
              class="accordion-collapse collapse {% if loop.first %}show{% endif %}">
           <div class="accordion-body p-0">
             <div class="table-responsive">
