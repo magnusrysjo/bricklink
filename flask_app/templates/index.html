@@ -303,7 +303,7 @@ document.addEventListener('change', async (e) => {
     const resp = await fetch(`/api/price_guide/${itemType}/${itemNo}?color_id=${colorId}&condition=${condition}`);
     const data = await resp.json();
     if (data.avg_price) {
-      priceInput.value = parseFloat(data.avg_price).toFixed(3);
+      priceInput.value = parseFloat(data.avg_price).toFixed(2);
       priceInput.placeholder = 'Pris';
     } else {
       priceInput.placeholder = 'Inget pris hittades';
@@ -379,7 +379,7 @@ async function searchItem(section) {
       try {
         const pr = await fetch(`/api/price_guide/${itemType}/${encodeURIComponent(itemNo)}?color_id=0&condition=${condition}`);
         const pd = await pr.json();
-        priceInput.value = pd.avg_price ? parseFloat(pd.avg_price).toFixed(3) : '';
+        priceInput.value = pd.avg_price ? parseFloat(pd.avg_price).toFixed(2) : '';
         priceInput.placeholder = pd.avg_price ? 'Pris' : 'Inget pris hittades';
       } catch { priceInput.placeholder = 'Kunde inte hämta pris'; }
     }
@@ -432,7 +432,7 @@ document.addEventListener('change', async (e) => {
   try {
     const resp = await fetch(`/api/price_guide/${itemType}/${encodeURIComponent(itemNo)}?color_id=${colorId}&condition=${condition}`);
     const data = await resp.json();
-    priceInput.value = data.avg_price ? parseFloat(data.avg_price).toFixed(3) : '';
+    priceInput.value = data.avg_price ? parseFloat(data.avg_price).toFixed(2) : '';
     priceInput.placeholder = data.avg_price ? 'Pris' : 'Inget pris hittades';
   } catch {
     priceInput.placeholder = 'Kunde inte hämta pris';
