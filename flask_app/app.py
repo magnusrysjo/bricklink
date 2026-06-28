@@ -1,6 +1,7 @@
 import os
+import requests
 from collections import defaultdict
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response
 from dotenv import load_dotenv
 import bricklink_api as bl
 
@@ -120,6 +121,24 @@ def new_item():
             flash(f"Fel vid skapande: {e}", "danger")
 
     return render_template("new_item.html")
+
+
+TYPE_CODE = {"PART": "P", "SET": "S", "MINIFIG": "M", "BOOK": "B",
+             "GEAR": "G", "CATALOG": "C", "INSTRUCTION": "I"}
+
+
+@app.route("/img/<item_type>/<int:color_id>/<path:item_no>")
+def item_image(item_type, color_id, item_no):
+    code = TYPE_CODE.get(item_type, "P")
+    url = f"https://img.bricklink.com/ItemImage/{code}L/{color_id}/{item_no}.png"
+    try:
+        resp = requests.get(url, timeout=5, headers={"Referer": "https://www.bricklink.com/"})
+        if resp.status_code == 200:
+            return Response(resp.content, content_type="image/png",
+                            headers={"Cache-Control": "public, max-age=86400"})
+    except Exception:
+        pass
+    return Response(status=204)
 
 
 # JSON API-endpoints för programmatisk åtkomst

@@ -2,10 +2,8 @@
 {% block title %}Inventory – BrickLink{% endblock %}
 
 {% macro item_img(item_no, item_type, color_id) %}
-  {% set type_map = {"PART":"P","SET":"S","MINIFIG":"M","BOOK":"B","GEAR":"G","CATALOG":"C","INSTRUCTION":"I"} %}
-  {% set code = type_map.get(item_type, "P") %}
   {% set cid = color_id if item_type == "PART" else 0 %}
-  <img src="https://img.bricklink.com/ItemImage/{{ code }}L/{{ cid }}/{{ item_no }}.png"
+  <img src="{{ url_for('item_image', item_type=item_type, color_id=cid, item_no=item_no) }}"
        alt="{{ item_no }}" width="48" height="48"
        style="object-fit:contain"
        onerror="this.style.visibility='hidden'">
