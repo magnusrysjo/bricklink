@@ -236,16 +236,43 @@ async function loadColors() {
   });
 }
 
-// Visa övriga fält när en färg väljs
-document.addEventListener('change', (e) => {
-  if (!e.target.classList.contains('new-color-select')) return;
+// Visa övriga fält och hämta pris när en färg väljs
+document.addEventListener('change', async (e) => {
+  if (!e.target.classList.contains('new-color-select') &&
+      !e.target.classList.contains('new-condition')) return;
+
   const row = e.target.closest('.add-color-row');
-  const show = !!e.target.value;
+  const colorSel = row.querySelector('.new-color-select');
+  const priceInput = row.querySelector('.new-price');
+  const show = !!colorSel.value;
+
   row.querySelector('.new-qty').style.display = show ? '' : 'none';
-  row.querySelector('.new-price').style.display = show ? '' : 'none';
+  priceInput.style.display = show ? '' : 'none';
   row.querySelector('.new-condition').style.display = show ? '' : 'none';
   row.querySelector('.new-remarks').style.display = show ? '' : 'none';
   row.querySelector('.save-new-color').style.display = show ? '' : 'none';
+
+  if (!show) return;
+
+  const condition = row.querySelector('.new-condition').value;
+  const colorId = colorSel.value;
+  const itemNo = row.dataset.itemNo;
+  const itemType = row.dataset.itemType;
+
+  priceInput.placeholder = 'Hämtar pris…';
+  priceInput.value = '';
+  try {
+    const resp = await fetch(`/api/price_guide/${itemType}/${itemNo}?color_id=${colorId}&condition=${condition}`);
+    const data = await resp.json();
+    if (data.avg_price) {
+      priceInput.value = parseFloat(data.avg_price).toFixed(3);
+      priceInput.placeholder = 'Pris';
+    } else {
+      priceInput.placeholder = 'Inget pris hittades';
+    }
+  } catch {
+    priceInput.placeholder = 'Kunde inte hämta pris';
+  }
 });
 
 // Ladda färger när en expanderbar rad öppnas

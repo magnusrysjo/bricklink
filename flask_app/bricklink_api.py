@@ -43,6 +43,16 @@ def enrich_with_category_names(inventory: list) -> None:
         item["category_name"] = _category_cache.get(cid, "Övrigt")
 
 
+def get_price_guide(item_type, item_no, color_id, condition="N"):
+    session = get_session()
+    params = {"guide_type": "sold", "new_or_used": condition}
+    if color_id:
+        params["color_id"] = color_id
+    resp = session.get(f"{BASE_URL}/items/{item_type}/{item_no}/price", params=params)
+    resp.raise_for_status()
+    return resp.json().get("data", {})
+
+
 def get_colors():
     global _colors_loaded
     if _colors_loaded:

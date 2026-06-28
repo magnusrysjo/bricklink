@@ -125,6 +125,18 @@ def new_item():
 
 
 # JSON API-endpoints för programmatisk åtkomst
+@app.route("/api/price_guide/<item_type>/<path:item_no>")
+def api_price_guide(item_type, item_no):
+    try:
+        color_id = request.args.get("color_id")
+        condition = request.args.get("condition", "N")
+        data = bl.get_price_guide(item_type, item_no, color_id, condition)
+        avg_price = data.get("avg_price", "")
+        return jsonify({"avg_price": avg_price})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/colors")
 def api_colors():
     try:
