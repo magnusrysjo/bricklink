@@ -197,6 +197,34 @@
                 {% endfor %}
               </tbody>
             </table>
+
+            {# Lägg till artikel #}
+            <div class="add-article-section p-3 border-top" data-item-type="{{ itype }}">
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <strong style="white-space:nowrap">+ Lägg till artikel</strong>
+                <input type="text" class="form-control form-control-sm new-item-no" placeholder="Artikelnummer, t.ex. 3001" style="max-width:200px">
+                <button class="btn btn-sm btn-outline-secondary search-item-btn">Sök</button>
+                <span class="item-lookup-status text-muted" style="font-size:0.85rem"></span>
+              </div>
+              <div class="add-article-fields mt-2" style="display:none">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <span class="found-item-name fw-bold text-success" style="min-width:180px"></span>
+                  <select class="form-select form-select-sm new-article-color" style="max-width:180px">
+                    <option value="">Välj färg…</option>
+                  </select>
+                  <input type="number" class="form-control form-control-sm new-article-qty" value="1" min="1" style="max-width:80px; display:none">
+                  <input type="text" class="form-control form-control-sm new-article-price" placeholder="Pris" style="max-width:90px; display:none">
+                  <select class="form-select form-select-sm new-article-condition" style="max-width:110px; display:none">
+                    <option value="N">Ny</option>
+                    <option value="U">Begagnad</option>
+                  </select>
+                  <input type="text" class="form-control form-control-sm new-article-remarks" placeholder="Anmärkning" style="max-width:130px; display:none">
+                  <button class="btn btn-sm btn-success save-new-article" style="display:none">Spara</button>
+                  <span class="new-article-status" style="font-size:0.85rem"></span>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -283,6 +311,128 @@ document.addEventListener('change', async (e) => {
 // Ladda färger när en expanderbar rad öppnas
 document.addEventListener('show.bs.collapse', (e) => {
   if (e.target.id && e.target.id.startsWith('row-')) loadColors();
+});
+
+// Artikelsökning — sök-knapp eller Enter
+async function searchItem(section) {
+  const itemNo = section.querySelector('.new-item-no').value.trim();
+  const itemType = section.dataset.itemType;
+  const status = section.querySelector('.item-lookup-status');
+  const fields = section.querySelector('.add-article-fields');
+  if (!itemNo) return;
+
+  status.textContent = 'Söker…';
+  fields.style.display = 'none';
+
+  try {
+    const resp = await fetch(`/api/item/${itemType}/${encodeURIComponent(itemNo)}`);
+    const data = await resp.json();
+    if (data.error || !data.name) throw new Error(data.error || 'Hittades inte');
+    status.textContent = '';
+    section.querySelector('.found-item-name').textContent = data.name;
+    // Sätt artikelnummer på sektionen för att kunna spara
+    section.dataset.foundItemNo = data.no || itemNo;
+    // Fyll färg-dropdown om den är tom
+    const colorSel = section.querySelector('.new-article-color');
+    if (colorSel.options.length <= 1) {
+      const cr = await fetch('/api/colors');
+      const colors = await cr.json();
+      colors.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.color_id;
+        opt.textContent = `${c.color_name} (${c.color_id})`;
+        colorSel.appendChild(opt);
+      });
+    }
+    fields.style.display = '';
+  } catch(err) {
+    status.textContent = `Hittades inte: ${err.message}`;
+    status.style.color = '#dc3545';
+  }
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.classList.contains('search-item-btn')) return;
+  searchItem(e.target.closest('.add-article-section'));
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || !e.target.classList.contains('new-item-no')) return;
+  e.preventDefault();
+  searchItem(e.target.closest('.add-article-section'));
+});
+
+// Visa pris/fält och hämta pris när färg väljs i artikel-sektionen
+document.addEventListener('change', async (e) => {
+  const isSel = e.target.classList.contains('new-article-color');
+  const isCond = e.target.classList.contains('new-article-condition');
+  if (!isSel && !isCond) return;
+
+  const section = e.target.closest('.add-article-section');
+  const colorSel = section.querySelector('.new-article-color');
+  const priceInput = section.querySelector('.new-article-price');
+  const show = !!colorSel.value;
+
+  section.querySelector('.new-article-qty').style.display = show ? '' : 'none';
+  priceInput.style.display = show ? '' : 'none';
+  section.querySelector('.new-article-condition').style.display = show ? '' : 'none';
+  section.querySelector('.new-article-remarks').style.display = show ? '' : 'none';
+  section.querySelector('.save-new-article').style.display = show ? '' : 'none';
+
+  if (!show) return;
+
+  const remarksInput = section.querySelector('.new-article-remarks');
+  if (!remarksInput.value) remarksInput.value = new Date().toISOString().slice(0, 10);
+
+  const itemNo = section.dataset.foundItemNo;
+  const itemType = section.dataset.itemType;
+  const colorId = colorSel.value;
+  const condition = section.querySelector('.new-article-condition').value;
+
+  priceInput.placeholder = 'Hämtar pris…';
+  priceInput.value = '';
+  try {
+    const resp = await fetch(`/api/price_guide/${itemType}/${encodeURIComponent(itemNo)}?color_id=${colorId}&condition=${condition}`);
+    const data = await resp.json();
+    priceInput.value = data.avg_price ? parseFloat(data.avg_price).toFixed(3) : '';
+    priceInput.placeholder = data.avg_price ? 'Pris' : 'Inget pris hittades';
+  } catch {
+    priceInput.placeholder = 'Kunde inte hämta pris';
+  }
+});
+
+// Spara ny artikel
+document.addEventListener('click', async (e) => {
+  if (!e.target.classList.contains('save-new-article')) return;
+  const section = e.target.closest('.add-article-section');
+  const status = section.querySelector('.new-article-status');
+  const body = {
+    item_no: section.dataset.foundItemNo,
+    item_type: section.dataset.itemType,
+    color_id: section.querySelector('.new-article-color').value,
+    quantity: section.querySelector('.new-article-qty').value,
+    unit_price: section.querySelector('.new-article-price').value,
+    condition: section.querySelector('.new-article-condition').value,
+    remarks: section.querySelector('.new-article-remarks').value,
+  };
+  if (!body.unit_price) { status.textContent = 'Ange pris'; status.style.color='#dc3545'; return; }
+  e.target.disabled = true;
+  status.textContent = '…';
+  try {
+    const resp = await fetch('/api/inventory', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    status.textContent = '✓ Sparad';
+    status.style.color = '#198754';
+    setTimeout(() => location.reload(), 800);
+  } catch(err) {
+    status.textContent = '✗ Fel';
+    status.style.color = '#dc3545';
+    e.target.disabled = false;
+  }
 });
 
 // Spara ny färg

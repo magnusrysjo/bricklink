@@ -125,6 +125,14 @@ def new_item():
 
 
 # JSON API-endpoints för programmatisk åtkomst
+@app.route("/api/item/<item_type>/<path:item_no>")
+def api_get_catalog_item(item_type, item_no):
+    try:
+        return jsonify(bl.get_item(item_type, item_no))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/price_guide/<item_type>/<path:item_no>")
 def api_price_guide(item_type, item_no):
     try:
