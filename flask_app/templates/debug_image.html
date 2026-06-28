@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Debug bild{% endblock %}
+{% block content %}
+<h4>Bildtest – item_no={{ item_no }}, color_id={{ color_id }}</h4>
+<p class="text-muted">Byt item i URL:en: <code>/debug/image?item_no=3001&color_id=11</code></p>
+
+<table class="table table-bordered bg-white">
+  <thead><tr><th>Format</th><th>URL</th><th>Bild</th></tr></thead>
+  <tbody>
+    {% set urls = [
+      ("PL/color/no.png",       "https://img.bricklink.com/ItemImage/PL/" ~ color_id ~ "/" ~ item_no ~ ".png"),
+      ("PN/color/no.png",       "https://img.bricklink.com/ItemImage/PN/" ~ color_id ~ "/" ~ item_no ~ ".png"),
+      ("P/color/no.png",        "https://img.bricklink.com/P/" ~ color_id ~ "/" ~ item_no ~ ".png"),
+      ("P/no.jpg (gammalt)",    "https://img.bricklink.com/P/" ~ item_no ~ ".jpg"),
+      ("PL/0/no.png (ingen farg)", "https://img.bricklink.com/ItemImage/PL/0/" ~ item_no ~ ".png"),
+    ] %}
+    {% for label, url in urls %}
+    <tr>
+      <td><code>{{ label }}</code></td>
+      <td><a href="{{ url }}" target="_blank"><small>{{ url }}</small></a></td>
+      <td>
+        <img src="{{ url }}" width="80" height="80" style="object-fit:contain;border:1px solid #ddd"
+             referrerpolicy="no-referrer"
+             onerror="this.insertAdjacentHTML('afterend','<span class=text-danger>✗ 404/blockad</span>');this.remove()">
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

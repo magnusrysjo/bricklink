@@ -159,6 +159,13 @@ def api_delete_item(inventory_id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/debug/image")
+def debug_image():
+    item_no = request.args.get("item_no", "3001")
+    color_id = request.args.get("color_id", "11")
+    return render_template("debug_image.html", item_no=item_no, color_id=color_id)
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5050))
     app.run(debug=True, port=port)
