@@ -320,8 +320,13 @@ document.addEventListener('show.bs.collapse', (e) => {
 
 // Artikelsökning — sök-knapp eller Enter
 async function searchItem(section) {
-  const itemNo = section.querySelector('.new-item-no').value.trim();
   const itemType = section.querySelector('.new-item-type').value;
+  let itemNo = section.querySelector('.new-item-no').value.trim();
+  const suffixTypes = ['SET', 'BOOK', 'GEAR', 'CATALOG', 'INSTRUCTION', 'ORIGINAL_BOX'];
+  if (suffixTypes.includes(itemType) && itemNo && !itemNo.includes('-')) {
+    itemNo += '-1';
+    section.querySelector('.new-item-no').value = itemNo;
+  }
   const status = section.querySelector('.item-lookup-status');
   const fields = section.querySelector('.add-article-fields');
   if (!itemNo) return;
