@@ -120,34 +120,44 @@
                           <tr class="text-muted" style="font-size:0.8rem">
                             <th style="width:56px"></th>
                             <th>Färg</th>
-                            <th class="text-end">Antal</th>
-                            <th class="text-end">Pris</th>
-                            <th>Skick</th>
-                            <th></th>
+                            <th style="width:90px">Antal</th>
+                            <th style="width:100px">Pris</th>
+                            <th style="width:110px">Skick</th>
+                            <th>Anmärkning</th>
+                            <th style="width:80px"></th>
                           </tr>
                         </thead>
                         <tbody>
                           {% for inv in entries %}
-                          <tr>
+                          <tr data-inv-id="{{ inv.inventory_id }}">
                             <td class="text-center">
                               {{ item_img(item_no, itype, inv.color_id or 0) }}
                             </td>
                             <td>{{ inv.color_name or '–' }}</td>
-                            <td class="text-end">{{ inv.quantity }}</td>
-                            <td class="text-end">{{ inv.unit_price }}</td>
                             <td>
-                              {% if inv.new_or_used == 'N' %}
-                                <span class="badge bg-success">Ny</span>
-                              {% else %}
-                                <span class="badge bg-secondary">Begagnad</span>
-                              {% endif %}
+                              <input type="number" class="form-control form-control-sm inv-field"
+                                     data-field="quantity" value="{{ inv.quantity }}" min="0">
+                            </td>
+                            <td>
+                              <input type="text" class="form-control form-control-sm inv-field"
+                                     data-field="unit_price" value="{{ inv.unit_price }}">
+                            </td>
+                            <td>
+                              <select class="form-select form-select-sm inv-field" data-field="new_or_used">
+                                <option value="N" {% if inv.new_or_used == 'N' %}selected{% endif %}>Ny</option>
+                                <option value="U" {% if inv.new_or_used == 'U' %}selected{% endif %}>Begagnad</option>
+                              </select>
+                            </td>
+                            <td>
+                              <input type="text" class="form-control form-control-sm inv-field"
+                                     data-field="remarks" value="{{ inv.remarks or '' }}"
+                                     placeholder="–">
                             </td>
                             <td class="text-end">
-                              <a href="{{ url_for('edit_item', inventory_id=inv.inventory_id) }}"
-                                 class="btn btn-sm btn-outline-primary">Redigera</a>
+                              <span class="save-indicator me-1" style="font-size:0.8rem"></span>
                               <form method="post" action="{{ url_for('delete_item', inventory_id=inv.inventory_id) }}"
-                                    class="d-inline" onsubmit="return confirm('Ta bort detta item?')">
-                                <button type="submit" class="btn btn-sm btn-outline-danger">Ta bort</button>
+                                    class="d-inline" onsubmit="return confirm('Ta bort?')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">✕</button>
                               </form>
                             </td>
                           </tr>
@@ -174,7 +184,49 @@
   .table-row-item:hover td { background: #e9ecef; }
   .table-row-item .expand-icon { font-size: 0.9rem; }
   .collapsing { transition: none !important; }
+  .inv-field { min-width: 60px; }
+  .inv-field:focus { border-color: #0d6efd; box-shadow: 0 0 0 2px rgba(13,110,253,.2); }
 </style>
+
+<script>
+document.addEventListener('change', async (e) => {
+  const field = e.target.closest('.inv-field');
+  if (!field) return;
+  const row = field.closest('tr[data-inv-id]');
+  const invId = row.dataset.invId;
+  const indicator = row.querySelector('.save-indicator');
+  const fieldName = field.dataset.field;
+  const value = field.value;
+
+  indicator.textContent = '…';
+  indicator.style.color = '#6c757d';
+
+  const body = {};
+  if (fieldName === 'quantity') body.quantity = parseInt(value);
+  else if (fieldName === 'unit_price') body.unit_price = value;
+  else if (fieldName === 'new_or_used') body.new_or_used = value;
+  else if (fieldName === 'remarks') body.remarks = value;
+
+  try {
+    const resp = await fetch(`/api/inventory/${invId}`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    if (resp.ok) {
+      indicator.textContent = '✓';
+      indicator.style.color = '#198754';
+      setTimeout(() => { indicator.textContent = ''; }, 2000);
+    } else {
+      throw new Error(await resp.text());
+    }
+  } catch (err) {
+    indicator.textContent = '✗';
+    indicator.style.color = '#dc3545';
+    indicator.title = err.message;
+  }
+});
+</script>
 
 {% endif %}
 {% endblock %}

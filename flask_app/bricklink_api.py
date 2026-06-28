@@ -58,7 +58,8 @@ def get_inventory_item(inventory_id):
     return resp.json().get("data", {})
 
 
-def update_inventory_item(inventory_id, quantity=None, unit_price=None, description=None, remarks=None):
+def update_inventory_item(inventory_id, quantity=None, unit_price=None, description=None,
+                          remarks=None, new_or_used=None):
     session = get_session()
     body = {}
     if quantity is not None:
@@ -69,6 +70,8 @@ def update_inventory_item(inventory_id, quantity=None, unit_price=None, descript
         body["description"] = description
     if remarks is not None:
         body["remarks"] = remarks
+    if new_or_used is not None:
+        body["new_or_used"] = new_or_used
     resp = session.put(f"{BASE_URL}/inventories/{inventory_id}", json=body)
     resp.raise_for_status()
     return resp.json().get("data", {})
