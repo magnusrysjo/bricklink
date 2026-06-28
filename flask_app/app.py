@@ -14,24 +14,26 @@ TYPE_ORDER = ["PART", "SET", "MINIFIG", "BOOK", "GEAR", "CATALOG", "INSTRUCTION"
 
 
 def _group_inventory(inventory: list) -> dict:
-    """Returns {item_type: {category_name: [items]}} sorted alphabetically."""
-    result: dict[str, dict[str, list]] = defaultdict(lambda: defaultdict(list))
-    for item in inventory:
-        itype = item.get("item", {}).get("type", "ÖVRIGT")
-        cat = item.get("category_name", "Övrigt")
-        result[itype][cat].append(item)
-    # Sort each category's items by item number
-    for itype in result:
-        for cat in result[itype]:
-            result[itype][cat].sort(key=lambda x: x.get("item", {}).get("no", ""))
-    # Return ordered by TYPE_ORDER, then alphabetically for unknown types
+    """Returns {item_type: {category_name: {item_no: [entries]}}} sorted alphabetically."""
+    result: dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    for entry in inventory:
+        itype = entry.get("item", {}).get("type", "ÖVRIGT")
+        cat = entry.get("category_name", "Övrigt")
+        item_no = entry.get("item", {}).get("no", "")
+        result[itype][cat][item_no].append(entry)
+
     ordered = {}
     for t in TYPE_ORDER:
-        if t in result:
-            ordered[t] = dict(sorted(result[t].items()))
+        if t not in result:
+            continue
+        ordered[t] = {}
+        for cat in sorted(result[t]):
+            ordered[t][cat] = dict(sorted(result[t][cat].items()))
     for t in sorted(result):
         if t not in ordered:
-            ordered[t] = dict(sorted(result[t].items()))
+            ordered[t] = {}
+            for cat in sorted(result[t]):
+                ordered[t][cat] = dict(sorted(result[t][cat].items()))
     return ordered
 
 

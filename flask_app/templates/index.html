@@ -38,10 +38,8 @@
   <p class="text-muted">Inga items hittades.</p>
 {% else %}
 
-{# Tabs för item-typer #}
-{% set types = grouped.keys()|list %}
 <ul class="nav nav-tabs mb-3" id="typeTabs" role="tablist">
-  {% for itype in types %}
+  {% for itype, categories in grouped.items() %}
   <li class="nav-item" role="presentation">
     <button class="nav-link {% if loop.first %}active{% endif %}"
             id="tab-{{ itype }}"
@@ -50,7 +48,13 @@
             type="button" role="tab">
       {{ itype }}
       <span class="badge bg-secondary ms-1">
-        {{ grouped[itype].values()|map('length')|sum }}
+        {% set ns = namespace(n=0) %}
+        {% for cat, items_by_no in categories.items() %}
+          {% for no, entries in items_by_no.items() %}
+            {% set ns.n = ns.n + entries|length %}
+          {% endfor %}
+        {% endfor %}
+        {{ ns.n }}
       </span>
     </button>
   </li>
@@ -62,68 +66,98 @@
   <div class="tab-pane fade {% if loop.first %}show active{% endif %}"
        id="pane-{{ itype }}" role="tabpanel">
 
-    {# Accordion för kategorier inom typen #}
     <div class="accordion" id="accordion-{{ itype }}">
-      {% for cat_name, items in categories.items() %}
-      {% set cat_id = loop.index %}
+      {% for cat_name, items_by_no in categories.items() %}
       <div class="accordion-item">
         <h2 class="accordion-header">
           <button class="accordion-button {% if not loop.first %}collapsed{% endif %}"
                   type="button" data-bs-toggle="collapse"
-                  data-bs-target="#collapse-{{ itype }}-{{ cat_id }}">
+                  data-bs-target="#collapse-{{ itype }}-{{ loop.index }}">
             {{ cat_name }}
-            <span class="badge bg-secondary ms-2">{{ items|length }}</span>
+            <span class="badge bg-secondary ms-2">{{ items_by_no|length }} artiklar</span>
           </button>
         </h2>
-        <div id="collapse-{{ itype }}-{{ cat_id }}"
+        <div id="collapse-{{ itype }}-{{ loop.index }}"
              class="accordion-collapse collapse {% if loop.first %}show{% endif %}">
           <div class="accordion-body p-0">
-            <div class="table-responsive">
-              <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
-                  <tr>
-                    <th></th>
-                    <th>Item</th>
-                    <th>Färg</th>
-                    <th class="text-end">Antal</th>
-                    <th class="text-end">Pris</th>
-                    <th>Skick</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for inv in items %}
-                  <tr>
-                    <td class="text-center" style="width:60px">
-                      {{ item_img(inv.item.no, inv.item.type, inv.color_id or 0) }}
-                    </td>
-                    <td>
-                      <strong>{{ inv.item.no }}</strong><br>
-                      <small class="text-muted">{{ inv.item.name }}</small>
-                    </td>
-                    <td>{{ inv.color_name or '–' }}</td>
-                    <td class="text-end">{{ inv.quantity }}</td>
-                    <td class="text-end">{{ inv.unit_price }}</td>
-                    <td>
-                      {% if inv.new_or_used == 'N' %}
-                        <span class="badge bg-success">Ny</span>
-                      {% else %}
-                        <span class="badge bg-secondary">Begagnad</span>
-                      {% endif %}
-                    </td>
-                    <td class="text-end">
-                      <a href="{{ url_for('edit_item', inventory_id=inv.inventory_id) }}"
-                         class="btn btn-sm btn-outline-primary">Redigera</a>
-                      <form method="post" action="{{ url_for('delete_item', inventory_id=inv.inventory_id) }}"
-                            class="d-inline" onsubmit="return confirm('Ta bort detta item?')">
-                        <button type="submit" class="btn btn-sm btn-outline-danger">Ta bort</button>
-                      </form>
-                    </td>
-                  </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:56px"></th>
+                  <th>Artikel</th>
+                  <th class="text-end">Totalt antal</th>
+                  <th style="width:40px"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item_no, entries in items_by_no.items() %}
+                {% set total_qty = entries|sum(attribute='quantity') %}
+                {% set first = entries[0] %}
+                {% set row_id = "row-" ~ itype ~ "-" ~ loop.index %}
+                <tr class="table-row-item" style="cursor:pointer"
+                    data-bs-toggle="collapse" data-bs-target="#{{ row_id }}">
+                  <td class="text-center">
+                    {{ item_img(item_no, itype, first.color_id or 0) }}
+                  </td>
+                  <td>
+                    <strong>{{ item_no }}</strong><br>
+                    <small class="text-muted">{{ first.item.name }}</small>
+                  </td>
+                  <td class="text-end fw-bold">{{ total_qty }}</td>
+                  <td class="text-center text-muted">
+                    {% if entries|length > 1 %}
+                      <span class="expand-icon">▸</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                <tr class="p-0">
+                  <td colspan="4" class="p-0 border-0">
+                    <div id="{{ row_id }}" class="collapse">
+                      <table class="table table-sm mb-0" style="background:#f8f9fa">
+                        <thead>
+                          <tr class="text-muted" style="font-size:0.8rem">
+                            <th style="width:56px"></th>
+                            <th>Färg</th>
+                            <th class="text-end">Antal</th>
+                            <th class="text-end">Pris</th>
+                            <th>Skick</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {% for inv in entries %}
+                          <tr>
+                            <td class="text-center">
+                              {{ item_img(item_no, itype, inv.color_id or 0) }}
+                            </td>
+                            <td>{{ inv.color_name or '–' }}</td>
+                            <td class="text-end">{{ inv.quantity }}</td>
+                            <td class="text-end">{{ inv.unit_price }}</td>
+                            <td>
+                              {% if inv.new_or_used == 'N' %}
+                                <span class="badge bg-success">Ny</span>
+                              {% else %}
+                                <span class="badge bg-secondary">Begagnad</span>
+                              {% endif %}
+                            </td>
+                            <td class="text-end">
+                              <a href="{{ url_for('edit_item', inventory_id=inv.inventory_id) }}"
+                                 class="btn btn-sm btn-outline-primary">Redigera</a>
+                              <form method="post" action="{{ url_for('delete_item', inventory_id=inv.inventory_id) }}"
+                                    class="d-inline" onsubmit="return confirm('Ta bort detta item?')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Ta bort</button>
+                              </form>
+                            </td>
+                          </tr>
+                          {% endfor %}
+                        </tbody>
+                      </table>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -133,6 +167,11 @@
   </div>
   {% endfor %}
 </div>
+
+<style>
+  .table-row-item:hover td { background: #e9ecef; }
+  .table-row-item .expand-icon { font-size: 0.9rem; }
+</style>
 
 {% endif %}
 {% endblock %}
