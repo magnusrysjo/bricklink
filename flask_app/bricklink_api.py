@@ -28,9 +28,9 @@ def _load_all_categories():
         resp.raise_for_status()
         for cat in resp.json().get("data", []):
             _category_cache[cat["category_id"]] = cat["category_name"]
+        _categories_loaded = True
     except Exception:
         pass
-    _categories_loaded = True
 
 
 def enrich_with_category_names(inventory: list) -> None:

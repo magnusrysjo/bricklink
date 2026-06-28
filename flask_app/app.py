@@ -44,7 +44,7 @@ def credentials_ok():
 def index():
     if not credentials_ok():
         flash("API-uppgifter saknas. Skapa en .env-fil baserat på .env.example.", "warning")
-        return render_template("index.html", inventory=[], error=None)
+        return render_template("index.html", grouped={}, total=0, item_type="", error=None)
     try:
         item_type = request.args.get("item_type", "")
         inventory = bl.get_inventory(item_type or None)
@@ -158,12 +158,6 @@ def api_delete_item(inventory_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
-@app.route("/debug/image")
-def debug_image():
-    item_no = request.args.get("item_no", "3001")
-    color_id = request.args.get("color_id", "11")
-    return render_template("debug_image.html", item_no=item_no, color_id=color_id)
 
 
 if __name__ == "__main__":
