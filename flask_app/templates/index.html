@@ -162,6 +162,33 @@
                             </td>
                           </tr>
                           {% endfor %}
+                          <tr class="add-color-row" data-item-no="{{ item_no }}" data-item-type="{{ itype }}">
+                            <td></td>
+                            <td>
+                              <select class="form-select form-select-sm new-color-select" style="min-width:140px">
+                                <option value="">+ Välj färg…</option>
+                              </select>
+                            </td>
+                            <td>
+                              <input type="number" class="form-control form-control-sm new-qty" value="1" min="1" style="display:none">
+                            </td>
+                            <td>
+                              <input type="text" class="form-control form-control-sm new-price" placeholder="Pris" style="display:none">
+                            </td>
+                            <td>
+                              <select class="form-select form-select-sm new-condition" style="display:none">
+                                <option value="N">Ny</option>
+                                <option value="U">Begagnad</option>
+                              </select>
+                            </td>
+                            <td>
+                              <input type="text" class="form-control form-control-sm new-remarks" placeholder="Anmärkning" style="display:none">
+                            </td>
+                            <td class="text-end">
+                              <button class="btn btn-sm btn-success save-new-color" style="display:none">Spara</button>
+                              <span class="new-color-status" style="font-size:0.8rem"></span>
+                            </td>
+                          </tr>
                         </tbody>
                       </table>
                     </div>
@@ -189,6 +216,78 @@
 </style>
 
 <script>
+// Ladda färger en gång och fyll i alla dropdowns
+let colorsLoaded = false;
+async function loadColors() {
+  if (colorsLoaded) return;
+  colorsLoaded = true;
+  const resp = await fetch('/api/colors');
+  const colors = await resp.json();
+  document.querySelectorAll('.new-color-select').forEach(sel => {
+    const first = sel.options[0];
+    sel.innerHTML = '';
+    sel.appendChild(first);
+    colors.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.color_id;
+      opt.textContent = `${c.color_name} (${c.color_id})`;
+      sel.appendChild(opt);
+    });
+  });
+}
+
+// Visa övriga fält när en färg väljs
+document.addEventListener('change', (e) => {
+  if (!e.target.classList.contains('new-color-select')) return;
+  const row = e.target.closest('.add-color-row');
+  const show = !!e.target.value;
+  row.querySelector('.new-qty').style.display = show ? '' : 'none';
+  row.querySelector('.new-price').style.display = show ? '' : 'none';
+  row.querySelector('.new-condition').style.display = show ? '' : 'none';
+  row.querySelector('.new-remarks').style.display = show ? '' : 'none';
+  row.querySelector('.save-new-color').style.display = show ? '' : 'none';
+});
+
+// Ladda färger när en expanderbar rad öppnas
+document.addEventListener('show.bs.collapse', (e) => {
+  if (e.target.id && e.target.id.startsWith('row-')) loadColors();
+});
+
+// Spara ny färg
+document.addEventListener('click', async (e) => {
+  if (!e.target.classList.contains('save-new-color')) return;
+  const row = e.target.closest('.add-color-row');
+  const status = row.querySelector('.new-color-status');
+  const body = {
+    item_no: row.dataset.itemNo,
+    item_type: row.dataset.itemType,
+    color_id: row.querySelector('.new-color-select').value,
+    quantity: row.querySelector('.new-qty').value,
+    unit_price: row.querySelector('.new-price').value,
+    condition: row.querySelector('.new-condition').value,
+    remarks: row.querySelector('.new-remarks').value,
+  };
+  if (!body.unit_price) { status.textContent = 'Ange pris'; status.style.color='#dc3545'; return; }
+  e.target.disabled = true;
+  status.textContent = '…';
+  try {
+    const resp = await fetch('/api/inventory', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    status.textContent = '✓ Sparad';
+    status.style.color = '#198754';
+    setTimeout(() => location.reload(), 800);
+  } catch(err) {
+    status.textContent = '✗ Fel';
+    status.style.color = '#dc3545';
+    status.title = err.message;
+    e.target.disabled = false;
+  }
+});
+
 document.addEventListener('change', async (e) => {
   const field = e.target.closest('.inv-field');
   if (!field) return;

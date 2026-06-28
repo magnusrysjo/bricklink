@@ -125,6 +125,33 @@ def new_item():
 
 
 # JSON API-endpoints för programmatisk åtkomst
+@app.route("/api/colors")
+def api_colors():
+    try:
+        return jsonify(bl.get_colors())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/inventory", methods=["POST"])
+def api_create_item():
+    try:
+        data = request.get_json()
+        result = bl.create_inventory_item(
+            item_no=data["item_no"],
+            item_type=data["item_type"],
+            color_id=int(data["color_id"]),
+            quantity=int(data["quantity"]),
+            unit_price=data["unit_price"],
+            condition=data.get("condition", "N"),
+            description=data.get("description", ""),
+            remarks=data.get("remarks", ""),
+        )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/inventory")
 def api_inventory():
     try:

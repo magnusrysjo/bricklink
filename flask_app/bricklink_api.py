@@ -3,6 +3,8 @@ from requests_oauthlib import OAuth1Session
 
 _category_cache: dict[int, str] = {}
 _categories_loaded = False
+_colors_cache: list = []
+_colors_loaded = False
 
 
 def get_session():
@@ -39,6 +41,23 @@ def enrich_with_category_names(inventory: list) -> None:
     for item in inventory:
         cid = item.get("item", {}).get("category_id", 0)
         item["category_name"] = _category_cache.get(cid, "Övrigt")
+
+
+def get_colors():
+    global _colors_loaded
+    if _colors_loaded:
+        return _colors_cache
+    try:
+        session = get_session()
+        resp = session.get(f"{BASE_URL}/colors")
+        resp.raise_for_status()
+        _colors_cache.extend(
+            sorted(resp.json().get("data", []), key=lambda c: c.get("color_name", ""))
+        )
+        _colors_loaded = True
+    except Exception:
+        pass
+    return _colors_cache
 
 
 def get_inventory(item_type=None):
