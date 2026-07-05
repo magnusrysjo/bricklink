@@ -160,7 +160,7 @@ def api_create_item():
         result = bl.create_inventory_item(
             item_no=data["item_no"],
             item_type=data["item_type"],
-            color_id=int(data["color_id"]),
+            color_id=int(data["color_id"]) if data.get("color_id") else 0,
             quantity=int(data["quantity"]),
             unit_price=data["unit_price"],
             condition=data.get("condition", "N"),
