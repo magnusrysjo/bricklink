@@ -155,8 +155,9 @@ def api_colors():
 
 @app.route("/api/inventory", methods=["POST"])
 def api_create_item():
+    data = request.get_json()
+    app.logger.info("POST /api/inventory: %s", data)
     try:
-        data = request.get_json()
         result = bl.create_inventory_item(
             item_no=data["item_no"],
             item_type=data["item_type"],
@@ -169,6 +170,8 @@ def api_create_item():
         )
         return jsonify(result)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
