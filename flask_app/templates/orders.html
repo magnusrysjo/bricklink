@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Ordrar – BrickLink{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h2 class="mb-0">Inkomna ordrar <span class="text-muted fs-5 fw-normal">{{ orders|length }} st</span></h2>
+  <form class="d-flex gap-2" method="get">
+    <select name="status" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+      <option value="">Alla statusar</option>
+      {% for s in ["PENDING","UPDATED","PROCESSING","READY","PAID","PACKED","SHIPPED","RECEIVED","COMPLETED","CANCELLED"] %}
+        <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+{% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+{% elif not orders %}
+  <p class="text-muted">Inga ordrar hittades.</p>
+{% else %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle bg-white rounded shadow-sm">
+    <thead class="table-light">
+      <tr>
+        <th>Order</th>
+        <th>Datum</th>
+        <th>Köpare</th>
+        <th class="text-end">Antal</th>
+        <th class="text-end">Summa</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for o in orders %}
+      <tr style="cursor:pointer" onclick="location.href='{{ url_for('order_detail', order_id=o.order_id) }}'">
+        <td><strong>#{{ o.order_id }}</strong></td>
+        <td>{{ o.date_ordered[:10] if o.date_ordered else '–' }}</td>
+        <td>{{ o.buyer_name }}</td>
+        <td class="text-end">{{ o.total_count }}</td>
+        <td class="text-end">{{ o.cost.grand_total if o.cost else '–' }} {{ o.cost.currency_code if o.cost else '' }}</td>
+        <td>
+          {% set status_colors = {
+            "PENDING": "warning", "UPDATED": "info", "PROCESSING": "info",
+            "READY": "primary", "PAID": "success", "PACKED": "primary",
+            "SHIPPED": "success", "RECEIVED": "success", "COMPLETED": "success",
+            "CANCELLED": "danger", "PURGED": "dark", "NPB": "danger", "NPX": "danger"
+          } %}
+          <span class="badge bg-{{ status_colors.get(o.status, 'secondary') }}">{{ o.status }}</span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

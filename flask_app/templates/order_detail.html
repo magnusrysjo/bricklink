@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Order #{{ order.order_id }} – BrickLink{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-3">
+  <a href="{{ url_for('orders') }}" class="btn btn-sm btn-outline-secondary">← Ordrar</a>
+  <h2 class="mb-0">Order #{{ order.order_id }}</h2>
+  <span class="badge bg-secondary fs-6">{{ order.status }}</span>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted mb-2">Köpare</h6>
+        <strong>{{ order.buyer_name }}</strong><br>
+        {{ order.buyer_email or '' }}<br>
+        {% if order.shipping and order.shipping.address %}
+          <small class="text-muted">
+            {{ order.shipping.address.name.full if order.shipping.address.name else '' }}<br>
+            {{ order.shipping.address.address1 or '' }}<br>
+            {{ order.shipping.address.postal_code or '' }} {{ order.shipping.address.city or '' }}<br>
+            {{ order.shipping.address.country_code or '' }}
+          </small>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted mb-2">Order</h6>
+        Datum: {{ order.date_ordered[:10] if order.date_ordered else '–' }}<br>
+        Antal artiklar: {{ order.total_count }}<br>
+        Unika lots: {{ order.unique_count }}<br>
+        {% if order.payment %}
+          Betalning: {{ order.payment.method or '–' }} ({{ order.payment.status or '–' }})
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted mb-2">Kostnad</h6>
+        {% if order.cost %}
+          Delsumma: {{ order.cost.subtotal }} {{ order.cost.currency_code }}<br>
+          Frakt: {{ order.cost.shipping or '0' }}<br>
+          <strong>Totalt: {{ order.cost.grand_total }} {{ order.cost.currency_code }}</strong>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<h5>Orderrader</h5>
+<div class="table-responsive">
+  <table class="table table-hover align-middle bg-white rounded shadow-sm">
+    <thead class="table-light">
+      <tr>
+        <th style="width:56px"></th>
+        <th>Artikel</th>
+        <th>Färg</th>
+        <th>Skick</th>
+        <th class="text-end">Antal</th>
+        <th class="text-end">Styckpris</th>
+        <th class="text-end">Summa</th>
+        <th>Anmärkning</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in items %}
+      <tr>
+        <td class="text-center">
+          {% if it.item.type == "PART" %}
+            <img src="https://img.bricklink.com/P/{{ it.color_id or 0 }}/{{ it.item.no }}.jpg"
+                 width="48" height="48" style="object-fit:contain"
+                 referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
+          {% elif it.item.type == "SET" %}
+            <img src="https://img.bricklink.com/S/{{ it.item.no }}.gif"
+                 width="48" height="48" style="object-fit:contain"
+                 referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
+          {% elif it.item.type == "MINIFIG" %}
+            <img src="https://img.bricklink.com/M/{{ it.item.no }}.jpg"
+                 width="48" height="48" style="object-fit:contain"
+                 referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
+          {% endif %}
+        </td>
+        <td>
+          <strong>{{ it.item.no }}</strong><br>
+          <small class="text-muted">{{ it.item.name }}</small>
+        </td>
+        <td>{{ it.color_name or '–' }}</td>
+        <td>
+          {% if it.new_or_used == 'N' %}
+            <span class="badge bg-success">Ny</span>
+          {% else %}
+            <span class="badge bg-secondary">Begagnad</span>
+          {% endif %}
+        </td>
+        <td class="text-end">{{ it.quantity }}</td>
+        <td class="text-end">{{ it.unit_price }}</td>
+        <td class="text-end">{{ (it.unit_price|float * it.quantity)|round(2) }}</td>
+        <td><small>{{ it.remarks or '–' }}</small></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

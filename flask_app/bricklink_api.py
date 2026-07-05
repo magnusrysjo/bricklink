@@ -130,6 +130,35 @@ def delete_inventory_item(inventory_id):
     return True
 
 
+def get_orders(direction="in", status=None):
+    session = get_session()
+    params = {"direction": direction}
+    if status:
+        params["status"] = status
+    resp = session.get(f"{BASE_URL}/orders", params=params)
+    resp.raise_for_status()
+    return resp.json().get("data", [])
+
+
+def get_order(order_id):
+    session = get_session()
+    resp = session.get(f"{BASE_URL}/orders/{order_id}")
+    resp.raise_for_status()
+    return resp.json().get("data", {})
+
+
+def get_order_items(order_id):
+    session = get_session()
+    resp = session.get(f"{BASE_URL}/orders/{order_id}/items")
+    resp.raise_for_status()
+    # Svaret är en lista av batchar; platta ut den
+    batches = resp.json().get("data", [])
+    items = [item for batch in batches for item in batch]
+    for item in items:
+        _unescape_item(item)
+    return items
+
+
 def create_inventory_item(item_no, item_type, color_id, quantity, unit_price,
                            condition="N", description="", remarks=""):
     session = get_session()

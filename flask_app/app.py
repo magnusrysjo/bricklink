@@ -130,6 +130,30 @@ def new_item():
     return render_template("new_item.html")
 
 
+@app.route("/orders")
+def orders():
+    try:
+        status_filter = request.args.get("status", "")
+        order_list = bl.get_orders(direction="in", status=status_filter or None)
+        # Nyaste först
+        order_list.sort(key=lambda o: o.get("date_ordered", ""), reverse=True)
+        return render_template("orders.html", orders=order_list,
+                               status_filter=status_filter, error=None)
+    except Exception as e:
+        return render_template("orders.html", orders=[], status_filter="", error=str(e))
+
+
+@app.route("/orders/<int:order_id>")
+def order_detail(order_id):
+    try:
+        order = bl.get_order(order_id)
+        items = bl.get_order_items(order_id)
+        return render_template("order_detail.html", order=order, items=items)
+    except Exception as e:
+        flash(f"Kunde inte hämta order: {e}", "danger")
+        return redirect(url_for("orders"))
+
+
 # JSON API-endpoints för programmatisk åtkomst
 @app.route("/api/item/<item_type>/<path:item_no>")
 def api_get_catalog_item(item_type, item_no):

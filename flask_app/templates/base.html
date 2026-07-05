@@ -16,6 +16,10 @@
   <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm mb-4">
     <div class="container">
       <a class="navbar-brand" href="{{ url_for('index') }}">🧱 BrickLink Inventory</a>
+      <div class="navbar-nav me-auto">
+        <a class="nav-link" href="{{ url_for('index') }}">Inventory</a>
+        <a class="nav-link" href="{{ url_for('orders') }}">Ordrar</a>
+      </div>
       <div class="ms-auto">
         <a href="{{ url_for('new_item') }}" class="btn btn-sm btn-danger">+ Nytt item</a>
       </div>
