@@ -141,6 +141,8 @@ def create_inventory_item(item_no, item_type, color_id, quantity, unit_price,
         "new_or_used": condition,
         "description": description,
         "remarks": remarks,
+        "is_retain": False,
+        "is_stock_room": False,
     }
     resp = session.post(f"{BASE_URL}/inventories", json=body)
     if not resp.ok:
