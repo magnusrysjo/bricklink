@@ -501,7 +501,8 @@ document.addEventListener('click', async (e) => {
     status.style.color = '#198754';
     setTimeout(() => location.reload(), 800);
   } catch(err) {
-    status.textContent = '✗ Fel';
+    console.error('Spara ny artikel:', err);
+    status.textContent = '✗ ' + err.message;
     status.style.color = '#dc3545';
     e.target.disabled = false;
   }
