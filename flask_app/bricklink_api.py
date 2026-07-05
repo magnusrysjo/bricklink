@@ -143,5 +143,6 @@ def create_inventory_item(item_no, item_type, color_id, quantity, unit_price,
         "remarks": remarks,
     }
     resp = session.post(f"{BASE_URL}/inventories", json=body)
-    resp.raise_for_status()
+    if not resp.ok:
+        raise RuntimeError(f"BrickLink {resp.status_code}: {resp.text}")
     return resp.json().get("data", {})
