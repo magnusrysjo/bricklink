@@ -148,7 +148,12 @@ def order_detail(order_id):
     try:
         order = bl.get_order(order_id)
         items = bl.get_order_items(order_id)
-        return render_template("order_detail.html", order=order, items=items)
+        bl.enrich_with_category_names(items)
+        grouped_items = defaultdict(list)
+        for it in items:
+            grouped_items[it.get("category_name", "Övrigt")].append(it)
+        grouped_items = dict(sorted(grouped_items.items()))
+        return render_template("order_detail.html", order=order, grouped_items=grouped_items)
     except Exception as e:
         flash(f"Kunde inte hämta order: {e}", "danger")
         return redirect(url_for("orders"))
