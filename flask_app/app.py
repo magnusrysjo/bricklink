@@ -22,6 +22,12 @@ def _group_inventory(inventory: list) -> dict:
         item_no = entry.get("item", {}).get("no", "")
         result[itype][cat][item_no].append(entry)
 
+    # Sortera färgvarianter per artikel efter färgnamn
+    for t in result:
+        for cat in result[t]:
+            for entries in result[t][cat].values():
+                entries.sort(key=lambda e: e.get("color_name") or "")
+
     ordered = {}
     for t in TYPE_ORDER:
         if t not in result:
