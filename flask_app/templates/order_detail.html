@@ -43,9 +43,9 @@
       <div class="card-body">
         <h6 class="text-muted mb-2">Kostnad</h6>
         {% if order.cost %}
-          Delsumma: {{ order.cost.subtotal }} {{ order.cost.currency_code }}<br>
-          Frakt: {{ order.cost.shipping or '0' }}<br>
-          <strong>Totalt: {{ order.cost.grand_total }} {{ order.cost.currency_code }}</strong>
+          Delsumma: {{ "%.2f"|format(order.cost.subtotal|float) }} {{ order.cost.currency_code }}<br>
+          Frakt: {{ "%.2f"|format((order.cost.shipping or 0)|float) }}<br>
+          <strong>Totalt: {{ "%.2f"|format(order.cost.grand_total|float) }} {{ order.cost.currency_code }}</strong>
         {% endif %}
       </div>
     </div>
@@ -54,17 +54,17 @@
 
 <h5>Orderrader</h5>
 <div class="table-responsive">
-  <table class="table table-hover align-middle bg-white rounded shadow-sm">
+  <table class="table table-hover align-middle bg-white rounded shadow-sm" id="orderItems">
     <thead class="table-light">
       <tr>
         <th style="width:56px"></th>
-        <th>Artikel</th>
-        <th>Färg</th>
-        <th>Skick</th>
-        <th class="text-end">Antal</th>
-        <th class="text-end">Styckpris</th>
-        <th class="text-end">Summa</th>
-        <th>Anmärkning</th>
+        <th class="sortable" data-sort="text">Artikel ↕</th>
+        <th class="sortable" data-sort="text">Färg ↕</th>
+        <th class="sortable" data-sort="text">Skick ↕</th>
+        <th class="sortable text-end" data-sort="num">Antal ↕</th>
+        <th class="sortable text-end" data-sort="num">Styckpris ↕</th>
+        <th class="sortable text-end" data-sort="num">Summa ↕</th>
+        <th class="sortable" data-sort="text">Anmärkning ↕</th>
       </tr>
     </thead>
     <tbody>
@@ -98,12 +98,44 @@
           {% endif %}
         </td>
         <td class="text-end">{{ it.quantity }}</td>
-        <td class="text-end">{{ it.unit_price }}</td>
-        <td class="text-end">{{ (it.unit_price|float * it.quantity)|round(2) }}</td>
+        <td class="text-end">{{ "%.2f"|format(it.unit_price|float) }}</td>
+        <td class="text-end">{{ "%.2f"|format(it.unit_price|float * it.quantity) }}</td>
         <td><small>{{ it.remarks or '–' }}</small></td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
+
+<style>
+  th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+  th.sortable:hover { background: #e9ecef; }
+</style>
+
+<script>
+document.querySelectorAll('#orderItems th.sortable').forEach(th => {
+  th.addEventListener('click', () => {
+    const table = th.closest('table');
+    const tbody = table.querySelector('tbody');
+    const colIndex = Array.from(th.parentNode.children).indexOf(th);
+    const type = th.dataset.sort;
+    const asc = th.dataset.asc !== 'true';
+    table.querySelectorAll('th.sortable').forEach(h => delete h.dataset.asc);
+    th.dataset.asc = asc;
+
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    rows.sort((a, b) => {
+      let va = a.children[colIndex].textContent.trim();
+      let vb = b.children[colIndex].textContent.trim();
+      if (type === 'num') {
+        va = parseFloat(va.replace(',', '.')) || 0;
+        vb = parseFloat(vb.replace(',', '.')) || 0;
+        return asc ? va - vb : vb - va;
+      }
+      return asc ? va.localeCompare(vb, 'sv') : vb.localeCompare(va, 'sv');
+    });
+    rows.forEach(r => tbody.appendChild(r));
+  });
+});
+</script>
 {% endblock %}
