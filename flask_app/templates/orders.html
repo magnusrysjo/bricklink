@@ -25,6 +25,7 @@
         <th>Order</th>
         <th>Datum</th>
         <th>Köpare</th>
+        <th>Fraktsätt</th>
         <th class="text-end">Antal</th>
         <th class="text-end">Summa</th>
         <th>Status</th>
@@ -36,6 +37,7 @@
         <td><strong>#{{ o.order_id }}</strong></td>
         <td>{{ o.date_ordered[:10] if o.date_ordered else '–' }}</td>
         <td>{{ o.buyer_name }}</td>
+        <td><small>{{ o.shipping.method if o.shipping and o.shipping.method else '–' }}</small></td>
         <td class="text-end">{{ o.total_count }}</td>
         <td class="text-end">{{ "%.2f"|format(o.cost.grand_total|float) if o.cost else '–' }} {{ o.cost.currency_code if o.cost else '' }}</td>
         <td>

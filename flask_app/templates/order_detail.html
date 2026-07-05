@@ -33,7 +33,13 @@
         Antal artiklar: {{ order.total_count }}<br>
         Unika lots: {{ order.unique_count }}<br>
         {% if order.payment %}
-          Betalning: {{ order.payment.method or '–' }} ({{ order.payment.status or '–' }})
+          Betalning: {{ order.payment.method or '–' }} ({{ order.payment.status or '–' }})<br>
+        {% endif %}
+        {% if order.shipping and order.shipping.method %}
+          Fraktsätt: <strong>{{ order.shipping.method }}</strong>
+          {% if order.shipping.date_shipped %}
+            <br><small class="text-muted">Skickad: {{ order.shipping.date_shipped[:10] }}</small>
+          {% endif %}
         {% endif %}
       </div>
     </div>
