@@ -543,9 +543,50 @@ document.addEventListener('click', async (e) => {
       body: JSON.stringify(body)
     });
     if (!resp.ok) throw new Error(await resp.text());
+    const created = await resp.json();
     status.textContent = '✓ Sparad';
     status.style.color = '#198754';
-    setTimeout(() => location.reload(), 800);
+
+    // Lägg in den nya raden direkt i tabellen, före lägg-till-raden
+    const colorName = row.querySelector('.new-color-select option:checked').textContent.replace(/ \(\d+\)$/, '');
+    const invId = created.inventory_id;
+    const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+    const newRow = document.createElement('tr');
+    newRow.dataset.invId = invId;
+    newRow.innerHTML = `
+      <td class="text-center">
+        <img src="https://img.bricklink.com/P/${esc(body.color_id)}/${esc(body.item_no)}.jpg"
+             width="48" height="48" style="object-fit:contain"
+             referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
+      </td>
+      <td>${esc(colorName)}</td>
+      <td><input type="number" class="form-control form-control-sm inv-field" data-field="quantity" value="${esc(body.quantity)}" min="0"></td>
+      <td><input type="text" class="form-control form-control-sm inv-field" data-field="unit_price" value="${esc(body.unit_price)}"></td>
+      <td>
+        <select class="form-select form-select-sm inv-field" data-field="new_or_used">
+          <option value="N" ${body.condition === 'N' ? 'selected' : ''}>Ny</option>
+          <option value="U" ${body.condition === 'U' ? 'selected' : ''}>Begagnad</option>
+        </select>
+      </td>
+      <td><input type="text" class="form-control form-control-sm inv-field" data-field="remarks" value="${esc(body.remarks)}" placeholder="–"></td>
+      <td class="text-end">
+        <span class="save-indicator me-1" style="font-size:0.8rem"></span>
+        <form method="post" action="/item/${invId}/delete" class="d-inline" onsubmit="return confirm('Ta bort?')">
+          <button type="submit" class="btn btn-sm btn-outline-danger">✕</button>
+        </form>
+      </td>`;
+    row.parentNode.insertBefore(newRow, row);
+
+    // Nollställ lägg-till-raden så nästa färg kan läggas till direkt
+    row.querySelector('.new-color-select').value = '';
+    row.querySelector('.new-qty').value = '1';
+    row.querySelector('.new-price').value = '';
+    row.querySelector('.new-remarks').value = '';
+    ['new-qty','new-price','new-condition','new-remarks','save-new-color'].forEach(c => {
+      row.querySelector('.' + c).style.display = 'none';
+    });
+    e.target.disabled = false;
+    setTimeout(() => { status.textContent = ''; }, 2000);
   } catch(err) {
     status.textContent = '✗ Fel';
     status.style.color = '#dc3545';
