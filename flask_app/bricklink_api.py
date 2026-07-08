@@ -109,7 +109,12 @@ def update_inventory_item(inventory_id, quantity=None, unit_price=None, descript
     session = get_session()
     body = {}
     if quantity is not None:
-        body["quantity"] = quantity
+        # BrickLink tolkar quantity i PUT som en RELATIV ändring (+/-),
+        # inte ett absolut värde. Hämta nuvarande antal och skicka differensen.
+        current = get_inventory_item(inventory_id).get("quantity", 0)
+        delta = int(quantity) - int(current)
+        if delta != 0:
+            body["quantity"] = delta
     if unit_price is not None:
         body["unit_price"] = str(unit_price)
     if description is not None:
@@ -118,6 +123,8 @@ def update_inventory_item(inventory_id, quantity=None, unit_price=None, descript
         body["remarks"] = remarks
     if new_or_used is not None:
         body["new_or_used"] = new_or_used
+    if not body:
+        return get_inventory_item(inventory_id)
     resp = session.put(f"{BASE_URL}/inventories/{inventory_id}", json=body)
     resp.raise_for_status()
     return resp.json().get("data", {})
