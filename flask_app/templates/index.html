@@ -346,9 +346,42 @@ document.addEventListener('change', async (e) => {
   }
 });
 
-// Ladda färger när en expanderbar rad öppnas
-document.addEventListener('show.bs.collapse', (e) => {
-  if (e.target.id && e.target.id.startsWith('row-')) loadColors();
+// Ladda färger + artikelvikt när en expanderbar rad öppnas
+const weightCache = {};
+document.addEventListener('show.bs.collapse', async (e) => {
+  if (!e.target.id || !e.target.id.startsWith('row-')) return;
+  loadColors();
+
+  // Hämta vikt (en gång per artikel)
+  const collapseDiv = e.target;
+  const addRow = collapseDiv.querySelector('.add-color-row');
+  if (!addRow) return;
+  const itemNo = addRow.dataset.itemNo;
+  const itemType = addRow.dataset.itemType;
+
+  let badge = collapseDiv.querySelector('.weight-badge');
+  if (!badge) {
+    badge = document.createElement('div');
+    badge.className = 'weight-badge text-muted px-3 pt-2';
+    badge.style.fontSize = '0.8rem';
+    collapseDiv.prepend(badge);
+  }
+
+  const key = itemType + '/' + itemNo;
+  if (weightCache[key] !== undefined) {
+    badge.textContent = weightCache[key];
+    return;
+  }
+  badge.textContent = 'Hämtar vikt…';
+  try {
+    const resp = await fetch(`/api/item/${itemType}/${encodeURIComponent(itemNo)}`);
+    const data = await resp.json();
+    const text = data.weight ? `Vikt: ${parseFloat(data.weight).toFixed(2).replace(/\.?0+$/,'')} g/st` : 'Vikt saknas';
+    weightCache[key] = text;
+    badge.textContent = text;
+  } catch {
+    badge.textContent = '';
+  }
 });
 
 // Artikelsökning — sök-knapp eller Enter
