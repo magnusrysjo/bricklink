@@ -151,6 +151,7 @@
                             <th style="width:56px"></th>
                             <th>Färg</th>
                             <th style="width:90px">Antal</th>
+                            <th style="width:100px">Totalvikt (g)</th>
                             <th style="width:100px">Pris</th>
                             <th style="width:110px">Skick</th>
                             <th>Anmärkning</th>
@@ -163,6 +164,7 @@
                             <td class="text-center">{{ item_img(item_no, itype, inv.color_id or 0) }}</td>
                             <td>{{ inv.color_name or '–' }}</td>
                             <td><input type="number" class="form-control form-control-sm inv-field" data-field="quantity" value="{{ inv.quantity }}" min="0"></td>
+                            <td><input type="number" step="any" class="form-control form-control-sm weight-to-qty" placeholder="g"></td>
                             <td><input type="text" class="form-control form-control-sm inv-field" data-field="unit_price" value="{{ inv.unit_price }}"></td>
                             <td>
                               <select class="form-select form-select-sm inv-field" data-field="new_or_used">
@@ -185,6 +187,7 @@
                               </select>
                             </td>
                             <td><input type="number" class="form-control form-control-sm new-qty" value="1" min="1" style="display:none"></td>
+                            <td></td>
                             <td><input type="text" class="form-control form-control-sm new-price" placeholder="Pris" style="display:none"></td>
                             <td>
                               <select class="form-select form-select-sm new-condition" style="display:none">
@@ -346,18 +349,29 @@ document.addEventListener('change', async (e) => {
   }
 });
 
-// Ladda färger + artikelvikt när en expanderbar rad öppnas
+// Viktcache: gram per styck (null = saknas)
 const weightCache = {};
+async function getUnitWeight(itemType, itemNo) {
+  const key = itemType + '/' + itemNo;
+  if (weightCache[key] !== undefined) return weightCache[key];
+  try {
+    const resp = await fetch(`/api/item/${itemType}/${encodeURIComponent(itemNo)}`);
+    const data = await resp.json();
+    weightCache[key] = data.weight ? parseFloat(data.weight) : null;
+  } catch {
+    weightCache[key] = null;
+  }
+  return weightCache[key];
+}
+
+// Ladda färger + artikelvikt när en expanderbar rad öppnas
 document.addEventListener('show.bs.collapse', async (e) => {
   if (!e.target.id || !e.target.id.startsWith('row-')) return;
   loadColors();
 
-  // Hämta vikt (en gång per artikel)
   const collapseDiv = e.target;
   const addRow = collapseDiv.querySelector('.add-color-row');
   if (!addRow) return;
-  const itemNo = addRow.dataset.itemNo;
-  const itemType = addRow.dataset.itemType;
 
   let badge = collapseDiv.querySelector('.weight-badge');
   if (!badge) {
@@ -366,22 +380,41 @@ document.addEventListener('show.bs.collapse', async (e) => {
     badge.style.fontSize = '0.8rem';
     collapseDiv.prepend(badge);
   }
+  badge.textContent = 'Hämtar vikt…';
+  const w = await getUnitWeight(addRow.dataset.itemType, addRow.dataset.itemNo);
+  badge.textContent = w ? `Vikt: ${w.toFixed(2).replace(/\.?0+$/,'')} g/st` : 'Vikt saknas';
+});
 
-  const key = itemType + '/' + itemNo;
-  if (weightCache[key] !== undefined) {
-    badge.textContent = weightCache[key];
+// Totalvikt → antal: räkna ut och spara via befintlig auto-save
+document.addEventListener('change', async (e) => {
+  if (!e.target.classList.contains('weight-to-qty')) return;
+  const input = e.target;
+  const value = input.value.trim().replace(',', '.');
+  if (!value) return;  // tomt fält = gör inget
+
+  const totalWeight = parseFloat(value);
+  if (isNaN(totalWeight) || totalWeight <= 0) return;
+
+  const row = input.closest('tr[data-inv-id]');
+  const addRow = row.closest('tbody').querySelector('.add-color-row');
+  const unitWeight = await getUnitWeight(addRow.dataset.itemType, addRow.dataset.itemNo);
+  if (!unitWeight) {
+    alert('Vikt saknas i BrickLinks katalog för denna artikel.');
+    input.value = '';
     return;
   }
-  badge.textContent = 'Hämtar vikt…';
-  try {
-    const resp = await fetch(`/api/item/${itemType}/${encodeURIComponent(itemNo)}`);
-    const data = await resp.json();
-    const text = data.weight ? `Vikt: ${parseFloat(data.weight).toFixed(2).replace(/\.?0+$/,'')} g/st` : 'Vikt saknas';
-    weightCache[key] = text;
-    badge.textContent = text;
-  } catch {
-    badge.textContent = '';
+
+  const qty = Math.round(totalWeight / unitWeight);
+  if (qty < 1) {
+    alert(`Totalvikten ${totalWeight} g motsvarar färre än 1 st (styckvikt ${unitWeight} g).`);
+    input.value = '';
+    return;
   }
+
+  const qtyInput = row.querySelector('.inv-field[data-field="quantity"]');
+  qtyInput.value = qty;
+  // Trigga befintlig auto-save
+  qtyInput.dispatchEvent(new Event('change', { bubbles: true }));
 });
 
 // Artikelsökning — sök-knapp eller Enter
@@ -607,6 +640,7 @@ document.addEventListener('click', async (e) => {
       </td>
       <td>${esc(colorName)}</td>
       <td><input type="number" class="form-control form-control-sm inv-field" data-field="quantity" value="${esc(body.quantity)}" min="0"></td>
+      <td><input type="number" step="any" class="form-control form-control-sm weight-to-qty" placeholder="g"></td>
       <td><input type="text" class="form-control form-control-sm inv-field" data-field="unit_price" value="${esc(body.unit_price)}"></td>
       <td>
         <select class="form-select form-select-sm inv-field" data-field="new_or_used">
