@@ -20,8 +20,11 @@
         <a class="nav-link" href="{{ url_for('index') }}">Inventory</a>
         <a class="nav-link" href="{{ url_for('orders') }}">Ordrar</a>
       </div>
-      <div class="ms-auto">
+      <div class="ms-auto d-flex gap-2">
         <a href="{{ url_for('new_item') }}" class="btn btn-sm btn-danger">+ Nytt item</a>
+        {% if session.get('logged_in') %}
+          <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary">Logga ut</a>
+        {% endif %}
       </div>
     </div>
   </nav>

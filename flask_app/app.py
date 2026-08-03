@@ -1,6 +1,7 @@
 import os
+import hmac
 from collections import defaultdict
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from dotenv import load_dotenv
 import bricklink_api as bl
 
@@ -8,6 +9,41 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-change-me")
+
+APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
+
+
+@app.before_request
+def require_login():
+    if not APP_PASSWORD:
+        return  # ingen inloggning konfigurerad (t.ex. lokal utveckling)
+    if request.endpoint in ("login", "static"):
+        return
+    if not session.get("logged_in"):
+        if request.path.startswith("/api/"):
+            return jsonify({"error": "Ej inloggad"}), 401
+        return redirect(url_for("login", next=request.path))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        if APP_PASSWORD and hmac.compare_digest(password, APP_PASSWORD):
+            session["logged_in"] = True
+            session.permanent = True
+            target = request.args.get("next", "")
+            if not target.startswith("/") or target.startswith("//"):
+                target = url_for("index")
+            return redirect(target)
+        flash("Fel lösenord.", "danger")
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 
 TYPE_ORDER = ["PART", "SET", "MINIFIG", "BOOK", "GEAR", "CATALOG", "INSTRUCTION", "UNSORTED_LOT", "ORIGINAL_BOX"]
