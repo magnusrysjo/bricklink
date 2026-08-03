@@ -10,6 +10,18 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-change-me")
 
+# Bakom nginx: lita på X-Forwarded-For/-Proto så att Flask vet att det är HTTPS
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+# Sätt SECURE_COOKIES=1 när appen körs bakom HTTPS
+if os.environ.get("SECURE_COOKIES") == "1":
+    app.config.update(
+        SESSION_COOKIE_SECURE=True,
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+    )
+
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
 
 
