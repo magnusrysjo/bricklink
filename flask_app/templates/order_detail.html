@@ -58,14 +58,18 @@
   </div>
 </div>
 
-<h5>Orderrader</h5>
+<div class="d-flex align-items-center gap-3">
+  <h5 class="mb-0">Orderrader</h5>
+  <span id="pickProgress" class="badge bg-secondary"></span>
+</div>
 {% for cat_name, items in grouped_items.items() %}
 <h6 class="mt-4 mb-2 text-muted">{{ cat_name }} <span class="badge bg-secondary">{{ items|length }}</span></h6>
 <div class="table-responsive">
   <table class="table table-hover align-middle bg-white rounded shadow-sm order-items-table">
     <colgroup>
+      <col style="width:44px">
       <col style="width:56px">
-      <col style="width:34%">
+      <col style="width:32%">
       <col style="width:16%">
       <col style="width:100px">
       <col style="width:70px">
@@ -75,6 +79,7 @@
     </colgroup>
     <thead class="table-light">
       <tr>
+        <th></th>
         <th></th>
         <th class="sortable" data-sort="text">Artikel ↕</th>
         <th class="sortable" data-sort="text">Färg ↕</th>
@@ -87,7 +92,10 @@
     </thead>
     <tbody>
       {% for it in items %}
-      <tr>
+      <tr class="pick-row" data-pick-id="{{ it.inventory_id or (it.item.no ~ '-' ~ it.color_id) }}">
+        <td class="text-center">
+          <input type="checkbox" class="form-check-input pick-box" style="width:1.3em;height:1.3em;cursor:pointer">
+        </td>
         <td class="text-center">
           {% if it.item.type == "PART" %}
             <img src="https://img.bricklink.com/P/{{ it.color_id or 0 }}/{{ it.item.no }}.jpg"
@@ -130,7 +138,50 @@
   th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
   th.sortable:hover { background: #e9ecef; }
   .order-items-table { table-layout: fixed; }
+  tr.picked td { opacity: 0.45; }
+  tr.picked td:nth-child(3) { text-decoration: line-through; }
 </style>
+
+<script>
+// Plockstatus sparas i webbläsaren per order
+const PICK_KEY = 'picked-order-{{ order.order_id }}';
+
+function loadPicked() {
+  try { return new Set(JSON.parse(localStorage.getItem(PICK_KEY)) || []); }
+  catch { return new Set(); }
+}
+
+function savePicked(set) {
+  localStorage.setItem(PICK_KEY, JSON.stringify([...set]));
+}
+
+function updateProgress() {
+  const total = document.querySelectorAll('.pick-row').length;
+  const done = document.querySelectorAll('.pick-row.picked').length;
+  const badge = document.getElementById('pickProgress');
+  badge.textContent = `${done}/${total} plockade`;
+  badge.className = 'badge ' + (done === total && total > 0 ? 'bg-success' : 'bg-secondary');
+}
+
+const picked = loadPicked();
+document.querySelectorAll('.pick-row').forEach(row => {
+  if (picked.has(row.dataset.pickId)) {
+    row.classList.add('picked');
+    row.querySelector('.pick-box').checked = true;
+  }
+});
+updateProgress();
+
+document.addEventListener('change', (e) => {
+  if (!e.target.classList.contains('pick-box')) return;
+  const row = e.target.closest('.pick-row');
+  const id = row.dataset.pickId;
+  if (e.target.checked) { picked.add(id); row.classList.add('picked'); }
+  else { picked.delete(id); row.classList.remove('picked'); }
+  savePicked(picked);
+  updateProgress();
+});
+</script>
 
 <script>
 document.querySelectorAll('.order-items-table th.sortable').forEach(th => {
