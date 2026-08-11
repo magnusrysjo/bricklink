@@ -1,5 +1,6 @@
 import os
 import hmac
+import sqlite3
 from collections import defaultdict
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from dotenv import load_dotenv
@@ -23,6 +24,48 @@ if os.environ.get("SECURE_COOKIES") == "1":
     )
 
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
+
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "picks.db")
+
+
+def get_db():
+    db = sqlite3.connect(DB_PATH)
+    db.execute("""CREATE TABLE IF NOT EXISTS picks (
+        order_id INTEGER NOT NULL,
+        pick_id TEXT NOT NULL,
+        PRIMARY KEY (order_id, pick_id)
+    )""")
+    return db
+
+
+@app.route("/api/picks/<int:order_id>")
+def api_get_picks(order_id):
+    db = get_db()
+    try:
+        rows = db.execute("SELECT pick_id FROM picks WHERE order_id = ?", (order_id,)).fetchall()
+        return jsonify([r[0] for r in rows])
+    finally:
+        db.close()
+
+
+@app.route("/api/picks/<int:order_id>", methods=["POST"])
+def api_set_pick(order_id):
+    data = request.get_json()
+    pick_id = str(data.get("pick_id", ""))
+    if not pick_id:
+        return jsonify({"error": "pick_id saknas"}), 400
+    db = get_db()
+    try:
+        if data.get("picked"):
+            db.execute("INSERT OR IGNORE INTO picks (order_id, pick_id) VALUES (?, ?)",
+                       (order_id, pick_id))
+        else:
+            db.execute("DELETE FROM picks WHERE order_id = ? AND pick_id = ?",
+                       (order_id, pick_id))
+        db.commit()
+        return jsonify({"ok": True})
+    finally:
+        db.close()
 
 
 @app.before_request

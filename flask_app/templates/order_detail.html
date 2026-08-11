@@ -143,17 +143,8 @@
 </style>
 
 <script>
-// Plockstatus sparas i webbläsaren per order
-const PICK_KEY = 'picked-order-{{ order.order_id }}';
-
-function loadPicked() {
-  try { return new Set(JSON.parse(localStorage.getItem(PICK_KEY)) || []); }
-  catch { return new Set(); }
-}
-
-function savePicked(set) {
-  localStorage.setItem(PICK_KEY, JSON.stringify([...set]));
-}
+// Plockstatus sparas på servern per order (synkas mellan enheter)
+const ORDER_ID = {{ order.order_id }};
 
 function updateProgress() {
   const total = document.querySelectorAll('.pick-row').length;
@@ -163,23 +154,42 @@ function updateProgress() {
   badge.className = 'badge ' + (done === total && total > 0 ? 'bg-success' : 'bg-secondary');
 }
 
-const picked = loadPicked();
-document.querySelectorAll('.pick-row').forEach(row => {
-  if (picked.has(row.dataset.pickId)) {
-    row.classList.add('picked');
-    row.querySelector('.pick-box').checked = true;
-  }
-});
-updateProgress();
-
-document.addEventListener('change', (e) => {
-  if (!e.target.classList.contains('pick-box')) return;
-  const row = e.target.closest('.pick-row');
-  const id = row.dataset.pickId;
-  if (e.target.checked) { picked.add(id); row.classList.add('picked'); }
-  else { picked.delete(id); row.classList.remove('picked'); }
-  savePicked(picked);
+// Återställ status från servern vid sidladdning
+(async () => {
+  try {
+    const resp = await fetch(`/api/picks/${ORDER_ID}`);
+    const picked = new Set(await resp.json());
+    document.querySelectorAll('.pick-row').forEach(row => {
+      if (picked.has(row.dataset.pickId)) {
+        row.classList.add('picked');
+        row.querySelector('.pick-box').checked = true;
+      }
+    });
+  } catch (e) { console.error('Kunde inte hämta plockstatus:', e); }
   updateProgress();
+})();
+
+document.addEventListener('change', async (e) => {
+  if (!e.target.classList.contains('pick-box')) return;
+  const box = e.target;
+  const row = box.closest('.pick-row');
+  const checked = box.checked;
+  row.classList.toggle('picked', checked);
+  updateProgress();
+  try {
+    const resp = await fetch(`/api/picks/${ORDER_ID}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ pick_id: row.dataset.pickId, picked: checked })
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+  } catch (err) {
+    // Backa UI:t om sparningen misslyckades
+    box.checked = !checked;
+    row.classList.toggle('picked', !checked);
+    updateProgress();
+    alert('Kunde inte spara plockstatus: ' + err.message);
+  }
 });
 </script>
 
