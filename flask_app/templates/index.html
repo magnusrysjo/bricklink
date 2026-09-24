@@ -54,9 +54,8 @@
   <div class="add-article-fields mt-2" style="display:none">
     <div class="d-flex align-items-center gap-2 flex-wrap">
       <span class="found-item-name fw-bold text-success" style="min-width:180px"></span>
-      <select class="form-select form-select-sm new-article-color" style="max-width:180px">
-        <option value="">Välj färg…</option>
-      </select>
+      <input type="text" class="form-control form-control-sm new-article-color" list="colorList"
+             placeholder="Sök färg…" style="max-width:180px" autocomplete="off">
       <input type="number" class="form-control form-control-sm new-article-qty" value="1" min="1" style="max-width:80px; display:none">
       <input type="text" class="form-control form-control-sm new-article-price" placeholder="Pris" style="max-width:90px; display:none">
       <select class="form-select form-select-sm new-article-condition" style="max-width:110px; display:none">
@@ -182,9 +181,8 @@
                           <tr class="add-color-row" data-item-no="{{ item_no }}" data-item-type="{{ itype }}">
                             <td></td>
                             <td>
-                              <select class="form-select form-select-sm new-color-select" style="min-width:140px">
-                                <option value="">+ Välj färg…</option>
-                              </select>
+                              <input type="text" class="form-control form-control-sm new-color-select" list="colorList"
+                                     placeholder="+ Sök färg…" style="min-width:140px" autocomplete="off">
                             </td>
                             <td><input type="number" class="form-control form-control-sm new-qty" value="1" min="1" style="display:none"></td>
                             <td></td>
@@ -281,25 +279,47 @@
 </style>
 
 <script>
-// Ladda färger en gång och fyll i alla dropdowns
-let colorsLoaded = false;
-async function loadColors() {
-  if (colorsLoaded) return;
-  colorsLoaded = true;
-  const resp = await fetch('/api/colors');
-  const colors = await resp.json();
-  document.querySelectorAll('.new-color-select').forEach(sel => {
-    const first = sel.options[0];
-    sel.innerHTML = '';
-    sel.appendChild(first);
-    colors.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c.color_id;
-      opt.textContent = `${c.color_name} (${c.color_id})`;
-      sel.appendChild(opt);
-    });
-  });
+// Färger laddas en gång till en gemensam datalist som alla färgfält söker i
+const colorsById = {};
+let colorsPromise = null;
+function loadColors() {
+  if (!colorsPromise) {
+    colorsPromise = (async () => {
+      const resp = await fetch('/api/colors');
+      const colors = await resp.json();
+      let dl = document.getElementById('colorList');
+      if (!dl) {
+        dl = document.createElement('datalist');
+        dl.id = 'colorList';
+        document.body.appendChild(dl);
+      }
+      colors.forEach(c => {
+        colorsById[c.color_id] = c.color_name;
+        const opt = document.createElement('option');
+        opt.value = `${c.color_name} (${c.color_id})`;
+        dl.appendChild(opt);
+      });
+    })().catch(err => { colorsPromise = null; throw err; });
+  }
+  return colorsPromise;
 }
+
+// Tolka färgfältets text till ett färg-ID ("Black (11)", "black" eller "11")
+function resolveColorId(input) {
+  const v = input.value.trim();
+  if (!v) return '';
+  const m = v.match(/\((\d+)\)\s*$/);
+  if (m && colorsById[m[1]] !== undefined) return m[1];
+  if (/^\d+$/.test(v) && colorsById[v] !== undefined) return v;
+  const lower = v.toLowerCase();
+  const hit = Object.entries(colorsById).find(([, name]) => name.toLowerCase() === lower);
+  return hit ? hit[0] : '';
+}
+
+// Ladda färglistan så fort man sätter fokus i ett färgfält
+document.addEventListener('focusin', (e) => {
+  if (e.target.matches('.new-color-select, .new-article-color')) loadColors();
+});
 
 // Visa övriga fält och hämta pris när en färg väljs
 document.addEventListener('change', async (e) => {
@@ -309,7 +329,10 @@ document.addEventListener('change', async (e) => {
   const row = e.target.closest('.add-color-row');
   const colorSel = row.querySelector('.new-color-select');
   const priceInput = row.querySelector('.new-price');
-  const show = !!colorSel.value;
+  await loadColors();
+  const colorId = resolveColorId(colorSel);
+  colorSel.classList.toggle('is-invalid', !!colorSel.value.trim() && !colorId);
+  const show = !!colorId;
 
   row.querySelector('.new-qty').style.display = show ? '' : 'none';
   priceInput.style.display = show ? '' : 'none';
@@ -320,7 +343,6 @@ document.addEventListener('change', async (e) => {
   if (!show) return;
 
   const condition = row.querySelector('.new-condition').value;
-  const colorId = colorSel.value;
   const itemNo = row.dataset.itemNo;
   const itemType = row.dataset.itemType;
 
@@ -450,17 +472,11 @@ async function searchItem(section) {
     const needsColor = itemType === 'PART';
 
     if (needsColor) {
+      delete section.dataset.foundColorId;
       colorSel.style.display = '';
-      if (colorSel.options.length <= 1) {
-        const cr = await fetch('/api/colors');
-        const colors = await cr.json();
-        colors.forEach(c => {
-          const opt = document.createElement('option');
-          opt.value = c.color_id;
-          opt.textContent = `${c.color_name} (${c.color_id})`;
-          colorSel.appendChild(opt);
-        });
-      }
+      colorSel.value = '';
+      await loadColors();
+      colorSel.focus();
     } else {
       colorSel.style.display = 'none';
       section.dataset.foundColorId = '0';
@@ -511,7 +527,13 @@ document.addEventListener('change', async (e) => {
   const section = e.target.closest('.add-article-section');
   const colorSel = section.querySelector('.new-article-color');
   const priceInput = section.querySelector('.new-article-price');
-  const show = !!colorSel.value;
+  let colorId = section.dataset.foundColorId;
+  if (!colorId) {
+    await loadColors();
+    colorId = resolveColorId(colorSel);
+    colorSel.classList.toggle('is-invalid', !!colorSel.value.trim() && !colorId);
+  }
+  const show = !!colorId;
 
   section.querySelector('.new-article-qty').style.display = show ? '' : 'none';
   priceInput.style.display = show ? '' : 'none';
@@ -526,7 +548,6 @@ document.addEventListener('change', async (e) => {
 
   const itemNo = section.dataset.foundItemNo;
   const itemType = section.querySelector('.new-item-type').value;
-  const colorId = section.dataset.foundColorId || colorSel.value;
   const condition = section.querySelector('.new-article-condition').value;
 
   const saveBtn = section.querySelector('.save-new-article');
@@ -553,7 +574,7 @@ document.addEventListener('click', async (e) => {
   const body = {
     item_no: section.dataset.foundItemNo,
     item_type: section.querySelector('.new-item-type').value,
-    color_id: section.dataset.foundColorId || section.querySelector('.new-article-color').value,
+    color_id: section.dataset.foundColorId || resolveColorId(section.querySelector('.new-article-color')),
     quantity: section.querySelector('.new-article-qty').value,
     unit_price: section.querySelector('.new-article-price').value,
     condition: section.querySelector('.new-article-condition').value,
@@ -606,7 +627,7 @@ document.addEventListener('click', async (e) => {
   const body = {
     item_no: row.dataset.itemNo,
     item_type: row.dataset.itemType,
-    color_id: row.querySelector('.new-color-select').value,
+    color_id: resolveColorId(row.querySelector('.new-color-select')),
     quantity: row.querySelector('.new-qty').value,
     unit_price: row.querySelector('.new-price').value,
     condition: row.querySelector('.new-condition').value,
@@ -627,7 +648,7 @@ document.addEventListener('click', async (e) => {
     status.style.color = '#198754';
 
     // Lägg in den nya raden direkt i tabellen, före lägg-till-raden
-    const colorName = row.querySelector('.new-color-select option:checked').textContent.replace(/ \(\d+\)$/, '');
+    const colorName = colorsById[body.color_id] || '';
     const invId = created.inventory_id;
     const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
     const newRow = document.createElement('tr');
