@@ -35,7 +35,44 @@ def get_db():
         pick_id TEXT NOT NULL,
         PRIMARY KEY (order_id, pick_id)
     )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS hidden_colors (
+        color_id INTEGER PRIMARY KEY
+    )""")
     return db
+
+
+@app.route("/settings")
+def settings():
+    return render_template("settings.html")
+
+
+@app.route("/api/settings/hidden_colors")
+def api_get_hidden_colors():
+    db = get_db()
+    try:
+        rows = db.execute("SELECT color_id FROM hidden_colors").fetchall()
+        return jsonify([r[0] for r in rows])
+    finally:
+        db.close()
+
+
+@app.route("/api/settings/hidden_colors", methods=["PUT"])
+def api_set_hidden_colors():
+    data = request.get_json()
+    if not isinstance(data, list):
+        return jsonify({"error": "Förväntade en lista med färg-ID"}), 400
+    try:
+        ids = {int(x) for x in data}
+    except (TypeError, ValueError):
+        return jsonify({"error": "Ogiltigt färg-ID"}), 400
+    db = get_db()
+    try:
+        db.execute("DELETE FROM hidden_colors")
+        db.executemany("INSERT INTO hidden_colors (color_id) VALUES (?)", [(i,) for i in ids])
+        db.commit()
+        return jsonify({"ok": True, "hidden": len(ids)})
+    finally:
+        db.close()
 
 
 @app.route("/api/picks/<int:order_id>")

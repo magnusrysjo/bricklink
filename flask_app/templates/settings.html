@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}Inställningar – BrickLink{% endblock %}
+{% block content %}
+<h2 class="mb-3">Inställningar</h2>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title">Färger i färgväljarna</h5>
+    <p class="text-muted mb-3">
+      Bocka ur färger du aldrig använder så slipper de synas när du lägger till artiklar.
+      Nya färger från BrickLink visas automatiskt tills du väljer bort dem.
+    </p>
+
+    <div class="settings-toolbar sticky-top bg-white py-2 mb-2 d-flex flex-wrap align-items-center gap-2">
+      <input type="text" id="colorFilter" class="form-control form-control-sm" placeholder="Filtrera färger…" style="max-width:220px">
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="checkAll">Markera alla synliga</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="uncheckAll">Avmarkera alla synliga</button>
+      <button type="button" class="btn btn-sm btn-outline-primary" id="onlyInventory"
+              title="Visar bara färgerna som finns i ditt inventory just nu">Bara färger jag har i lager</button>
+      <span class="ms-auto d-flex align-items-center gap-2">
+        <span id="colorCount" class="text-muted small"></span>
+        <span id="saveStatus" class="small"></span>
+        <button type="button" class="btn btn-sm btn-primary" id="saveColors" disabled>Spara</button>
+      </span>
+    </div>
+
+    <div id="colorGrid" class="color-grid">
+      <div class="text-muted">Laddar färger…</div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .color-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 2px 16px;
+  }
+  .color-option {
+    display: flex; align-items: center; gap: 8px; padding: 4px 6px;
+    border-radius: 4px; cursor: pointer; user-select: none; margin: 0;
+  }
+  .color-option:hover { background: #f1f3f5; }
+  .color-option.unchecked .color-option-name { color: #adb5bd; text-decoration: line-through; }
+  .color-option.unchecked .color-swatch { opacity: .35; }
+  .color-swatch {
+    width: 18px; height: 18px; border-radius: 4px; flex-shrink: 0;
+    border: 1px solid rgba(0,0,0,.25);
+  }
+  .color-option-name { flex: 1; font-size: .9rem; }
+  .color-option-id { color: #6c757d; font-size: .75rem; }
+  .in-stock-badge { font-size: .65rem; }
+  .settings-toolbar { z-index: 1020; border-bottom: 1px solid #dee2e6; }
+</style>
+
+<script>
+const grid = document.getElementById('colorGrid');
+const saveBtn = document.getElementById('saveColors');
+const saveStatus = document.getElementById('saveStatus');
+let colors = [];
+let savedHidden = new Set();
+let inStock = null;
+
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+
+function currentHidden() {
+  const hidden = new Set();
+  grid.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    if (!cb.checked) hidden.add(Number(cb.value));
+  });
+  return hidden;
+}
+
+function refreshState() {
+  const hidden = currentHidden();
+  grid.querySelectorAll('.color-option').forEach(label => {
+    label.classList.toggle('unchecked', !label.querySelector('input').checked);
+  });
+  const shown = colors.length - hidden.size;
+  document.getElementById('colorCount').textContent = `${shown} av ${colors.length} visas`;
+  const dirty = hidden.size !== savedHidden.size || [...hidden].some(id => !savedHidden.has(id));
+  saveBtn.disabled = !dirty;
+  if (dirty) { saveStatus.textContent = 'Osparade ändringar'; saveStatus.style.color = '#b58105'; }
+}
+
+function render() {
+  grid.innerHTML = colors.map(c => {
+    const code = c.color_code ? '#' + String(c.color_code).replace(/^#/, '') : null;
+    const swatch = code ? `background:${esc(code)}` : 'background:transparent;border-style:dashed';
+    const stock = inStock && inStock.has(c.color_id)
+      ? '<span class="badge bg-success in-stock-badge">i lager</span>' : '';
+    return `
+      <label class="color-option" data-name="${esc(c.color_name.toLowerCase())}" data-id="${c.color_id}">
+        <input type="checkbox" class="form-check-input m-0" value="${c.color_id}" ${savedHidden.has(c.color_id) ? '' : 'checked'}>
+        <span class="color-swatch" style="${swatch}"></span>
+        <span class="color-option-name">${esc(c.color_name)}</span>
+        ${stock}
+        <span class="color-option-id">${c.color_id}</span>
+      </label>`;
+  }).join('');
+  refreshState();
+}
+
+function visibleOptions() {
+  return [...grid.querySelectorAll('.color-option')].filter(el => el.style.display !== 'none');
+}
+
+(async () => {
+  try {
+    const [cr, hr] = await Promise.all([
+      fetch('/api/colors'), fetch('/api/settings/hidden_colors')
+    ]);
+    colors = await cr.json();
+    if (colors.error) throw new Error(colors.error);
+    savedHidden = new Set((await hr.json()).map(Number));
+    render();
+  } catch (err) {
+    grid.innerHTML = `<div class="text-danger">Kunde inte ladda färger: ${esc(err.message)}</div>`;
+  }
+})();
+
+grid.addEventListener('change', refreshState);
+
+document.getElementById('colorFilter').addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  grid.querySelectorAll('.color-option').forEach(el => {
+    el.style.display = !q || el.dataset.name.includes(q) || el.dataset.id === q ? '' : 'none';
+  });
+});
+
+document.getElementById('checkAll').addEventListener('click', () => {
+  visibleOptions().forEach(el => { el.querySelector('input').checked = true; });
+  refreshState();
+});
+document.getElementById('uncheckAll').addEventListener('click', () => {
+  visibleOptions().forEach(el => { el.querySelector('input').checked = false; });
+  refreshState();
+});
+
+document.getElementById('onlyInventory').addEventListener('click', async (e) => {
+  const btn = e.target;
+  if (!confirm('Visa bara de färger som finns i ditt inventory just nu? Alla andra bockas ur (du kan justera innan du sparar).')) return;
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = 'Hämtar inventory…';
+  try {
+    const resp = await fetch('/api/inventory');
+    const inv = await resp.json();
+    if (inv.error) throw new Error(inv.error);
+    inStock = new Set(inv.map(i => i.color_id).filter(id => id !== undefined && id !== null));
+    render();  // visar "i lager"-märken
+    grid.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.checked = inStock.has(Number(cb.value));
+    });
+    document.getElementById('colorFilter').dispatchEvent(new Event('input'));
+    refreshState();
+  } catch (err) {
+    alert('Kunde inte hämta inventory: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+});
+
+saveBtn.addEventListener('click', async () => {
+  const hidden = [...currentHidden()];
+  saveBtn.disabled = true;
+  saveStatus.textContent = 'Sparar…';
+  saveStatus.style.color = '#6c757d';
+  try {
+    const resp = await fetch('/api/settings/hidden_colors', {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(hidden)
+    });
+    if (!resp.ok) throw new Error((await resp.json()).error || resp.statusText);
+    savedHidden = new Set(hidden);
+    refreshState();
+    saveStatus.textContent = '✓ Sparat';
+    saveStatus.style.color = '#198754';
+  } catch (err) {
+    saveBtn.disabled = false;
+    saveStatus.textContent = '✗ ' + err.message;
+    saveStatus.style.color = '#dc3545';
+  }
+});
+
+window.addEventListener('beforeunload', (e) => {
+  if (!saveBtn.disabled) { e.preventDefault(); e.returnValue = ''; }
+});
+</script>
+{% endblock %}

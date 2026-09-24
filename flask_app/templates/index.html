@@ -302,14 +302,19 @@ let colorsPromise = null;
 function loadColors() {
   if (!colorsPromise) {
     colorsPromise = (async () => {
-      const resp = await fetch('/api/colors');
+      const [resp, hiddenResp] = await Promise.all([
+        fetch('/api/colors'), fetch('/api/settings/hidden_colors')
+      ]);
       const colors = await resp.json();
-      colorsList = colors.map(c => ({
+      const hidden = new Set((hiddenResp.ok ? await hiddenResp.json() : []).map(String));
+      const all = colors.map(c => ({
         id: String(c.color_id),
         name: c.color_name,
         code: c.color_code ? '#' + String(c.color_code).replace(/^#/, '') : null,
       }));
-      colorsList.forEach(c => { colorsById[c.id] = c.name; });
+      // Alla färger går att slå upp, men dolda visas inte i förslagslistan
+      all.forEach(c => { colorsById[c.id] = c.name; });
+      colorsList = all.filter(c => !hidden.has(c.id));
     })().catch(err => { colorsPromise = null; throw err; });
   }
   return colorsPromise;
