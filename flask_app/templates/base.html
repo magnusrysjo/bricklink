@@ -12,14 +12,16 @@
     .badge-U { background-color: #6c757d; }
   </style>
   <script>
-    // Utpris för nya lagerposter: snittpris + 10 %, avrundat uppåt till hel krona.
-    // Avrunda till ören först så att t.ex. 10,00 × 1,1 inte blir 11,0000000002 → 12.
+    // Utpris för nya lagerposter: snittpris + 10 %, avrundat uppåt till hel krona,
+    // eller till 10 öre om priset understiger 2 kr.
+    // Räknar i hela ören så att t.ex. 10,00 × 1,1 inte blir 11,0000000002 → 12.
     const PRICE_MARKUP = 1.1;
     function listPrice(avg) {
       const p = parseFloat(avg);
       if (!p) return '';
-      const withMarkup = Math.round(p * PRICE_MARKUP * 100) / 100;
-      return String(Math.ceil(withMarkup));
+      const cents = Math.round(p * PRICE_MARKUP * 100);
+      if (cents < 200) return (Math.ceil(cents / 10) / 10).toFixed(2);
+      return String(Math.ceil(cents / 100));
     }
   </script>
 </head>
