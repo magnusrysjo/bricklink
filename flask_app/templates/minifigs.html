@@ -94,7 +94,9 @@
     background: #fff;
   }
   .part-chip img { width: 32px; height: 32px; object-fit: contain; }
-  .part-chip.missing { border-color: #f1aeb5; background: #fff5f5; }
+  .part-chip.missing { border-color: #f1aeb5; background: #fff5f5; color: inherit; text-decoration: none; }
+  a.part-chip.missing:hover { border-color: #dc3545; background: #ffe9ec; }
+  .chip-link { color: #dc3545; font-weight: 600; }
   .part-chip.have { border-color: #a3cfbb; background: #f3faf6; }
   .fig-parts { margin-top: 4px; }
   .fig-parts summary { cursor: pointer; font-size: .85rem; color: #6c757d; }
@@ -226,10 +228,21 @@ function chip(p, cls) {
   const price = cls === 'missing'
     ? ` · <span class="part-price" data-price-key="${esc(pkey(p.type, p.no, p.color_id))}">${partPriceHtml(pkey(p.type, p.no, p.color_id))}</span>`
     : '';
-  return `<span class="part-chip ${cls}" title="${esc(p.name)}">
+  const inner = `
       <img src="${partImg(p)}" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
-      <span>${qty}<strong>${esc(p.no)}</strong>${color ? ' · ' + esc(color) : ''}${stockNote}${price}${tags}</span>
-    </span>`;
+      <span>${qty}<strong>${esc(p.no)}</strong>${color ? ' · ' + esc(color) : ''}${stockNote}${price}${tags}</span>`;
+  if (cls === 'missing') {
+    return `<a class="part-chip ${cls}" href="${esc(bricklinkUrl(p))}" target="_blank" rel="noopener"
+               title="${esc(p.name)} – öppna på BrickLink">${inner} <span class="chip-link">↗</span></a>`;
+  }
+  return `<span class="part-chip ${cls}" title="${esc(p.name)}">${inner}</span>`;
+}
+
+// BrickLinks katalogsida för delen, med färgen vald och fliken "till salu" öppen
+function bricklinkUrl(p) {
+  const letter = { PART: 'P', MINIFIG: 'M', SET: 'S', GEAR: 'G', BOOK: 'B' }[p.type] || 'P';
+  const base = `https://www.bricklink.com/v2/catalog/catalogitem.page?${letter}=${encodeURIComponent(p.no)}`;
+  return p.color_id ? `${base}&idColor=${p.color_id}#T=S&C=${p.color_id}` : `${base}#T=S`;
 }
 
 // Var delarna ligger: i butiken (till salu) och/eller i Stockroom
