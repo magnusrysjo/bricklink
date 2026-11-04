@@ -30,6 +30,13 @@
     </select>
   </label>
   <input type="text" id="figFilter" class="form-control form-control-sm" placeholder="Filtrera på namn eller nummer…" style="max-width:260px">
+  <label class="d-flex align-items-center gap-2 mb-0">
+    Sortera
+    <select id="sortBy" class="form-select form-select-sm" style="width:auto">
+      <option value="missing">Saknade delar</option>
+      <option value="price">Pris, högst först</option>
+    </select>
+  </label>
   <span id="resultCount" class="text-muted small"></span>
 </div>
 
@@ -53,8 +60,93 @@
 <script>
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 const figs = new Map();       // figurnummer -> {no, name, groups, viaTorso}
+const prices = new Map();     // "TYP|nr|färg" -> {avg_price, currency, sold} | {error}
+const priceQueue = [];
+let priceWorkers = 0;
 let stock = {};
 let colorNames = {};
+
+const pkey = (type, no, color) => `${type}|${no}|${color || 0}`;
+const figKey = no => pkey('MINIFIG', no, 0);
+
+function priceHtml(key) {
+  const p = prices.get(key);
+  if (!p) return '<span class="text-muted small">Hämtar pris…</span>';
+  if (p.error) return '<span class="text-muted small" title="' + esc(p.error) + '">Pris saknas</span>';
+  if (!p.avg_price) return '<span class="text-muted small">Inga försäljningar</span>';
+  return `<span class="fw-semibold">${p.avg_price.toFixed(2)} ${esc(p.currency)}</span>
+          <span class="text-muted small">snitt begagnad · ${p.sold} sålda</span>`;
+}
+
+function partPriceHtml(key) {
+  const p = prices.get(key);
+  if (!p) return '…';
+  if (p.error || !p.avg_price) return 'pris saknas';
+  return `${p.avg_price.toFixed(2)} ${esc(p.currency)}`;
+}
+
+// Hur många av delen som saknas (behov minus det du har)
+const missingQty = p => Math.max(p.quantity - stockOf(p), 1);
+
+function missingCostHtml(fig) {
+  const missing = evaluate(fig).missing;
+  if (!missing.length) return '';
+  let sum = 0, currency = '', pending = 0, unknown = 0;
+  for (const p of missing) {
+    const pr = prices.get(pkey(p.type, p.no, p.color_id));
+    if (!pr) { pending++; continue; }
+    if (pr.error || !pr.avg_price) { unknown++; continue; }
+    sum += pr.avg_price * missingQty(p);
+    currency = pr.currency;
+  }
+  if (pending) return '<span class="text-muted small">Saknade delar: hämtar priser…</span>';
+  const note = unknown ? ` <span class="text-muted">(${unknown} utan pris)</span>` : '';
+  return `<span class="small">Saknade delar: <strong>${sum.toFixed(2)} ${esc(currency)}</strong>${note}</span>`;
+}
+
+function updatePriceEls() {
+  document.querySelectorAll('[data-price-key]').forEach(el => {
+    const key = el.dataset.priceKey;
+    el.innerHTML = el.classList.contains('part-price') ? partPriceHtml(key) : priceHtml(key);
+  });
+  document.querySelectorAll('.missing-cost').forEach(el => {
+    const fig = figs.get(el.dataset.no);
+    if (fig) el.innerHTML = missingCostHtml(fig);
+  });
+}
+
+// Hämtar priser för synliga figurer och deras saknade delar, några i taget
+function requestPrices(items) {
+  for (const it of items) {
+    const key = pkey(it.type, it.no, it.color_id);
+    if (!prices.has(key) && !priceQueue.some(q => q.key === key)) priceQueue.push({ ...it, key });
+  }
+  while (priceWorkers < 3 && priceQueue.length) {
+    priceWorkers++;
+    (async () => {
+      while (priceQueue.length) {
+        const it = priceQueue.shift();
+        if (prices.has(it.key)) continue;
+        try {
+          const r = await fetch(`/api/catalog_price/${it.type}/${encodeURIComponent(it.no)}?color_id=${it.color_id || 0}`);
+          const d = await r.json();
+          prices.set(it.key, d.error ? { error: d.error } : d);
+        } catch (err) {
+          prices.set(it.key, { error: err.message });
+        }
+        updatePriceEls();
+        if (document.getElementById('sortBy').value === 'price') scheduleRender();
+      }
+      priceWorkers--;
+    })();
+  }
+}
+
+let renderTimer = null;
+function scheduleRender() {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(render, 300);
+}
 
 function partImg(p) {
   if (p.type === 'MINIFIG') return `https://img.bricklink.com/M/${encodeURIComponent(p.no)}.jpg`;
@@ -80,9 +172,12 @@ function chip(p, cls) {
   const owned = stockOf(p);
   const qty = p.quantity > 1 ? `${p.quantity}× ` : '';
   const stockNote = cls === 'missing' && owned ? ` (har ${owned})` : '';
+  const price = cls === 'missing'
+    ? ` · <span class="part-price" data-price-key="${esc(pkey(p.type, p.no, p.color_id))}">${partPriceHtml(pkey(p.type, p.no, p.color_id))}</span>`
+    : '';
   return `<span class="part-chip ${cls}" title="${esc(p.name)}">
       <img src="${partImg(p)}" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
-      <span>${qty}<strong>${esc(p.no)}</strong>${color ? ' · ' + esc(color) : ''}${stockNote}</span>
+      <span>${qty}<strong>${esc(p.no)}</strong>${color ? ' · ' + esc(color) : ''}${stockNote}${price}</span>
     </span>`;
 }
 
@@ -97,7 +192,12 @@ function render() {
     if (q && !fig.name.toLowerCase().includes(q) && !fig.no.toLowerCase().includes(q)) continue;
     rows.push({ fig, ev });
   }
-  rows.sort((a, b) => a.ev.missing.length - b.ev.missing.length || a.fig.name.localeCompare(b.fig.name, 'sv'));
+  const priceOf = r => prices.get(figKey(r.fig.no))?.avg_price || 0;
+  if (document.getElementById('sortBy').value === 'price') {
+    rows.sort((a, b) => priceOf(b) - priceOf(a) || a.ev.missing.length - b.ev.missing.length);
+  } else {
+    rows.sort((a, b) => a.ev.missing.length - b.ev.missing.length || a.fig.name.localeCompare(b.fig.name, 'sv'));
+  }
 
   document.getElementById('resultCount').textContent =
     `${rows.length} figurer visas · ${[...figs.values()].filter(f => f.groups.length && !evaluate(f).missing.length).length} kompletta totalt`;
@@ -119,6 +219,8 @@ function render() {
               ${owned ? `<span class="badge bg-secondary">${owned} st som hel figur i lager</span>` : ''}
             </div>
             <div>${esc(fig.name)}</div>
+            <div class="fig-price" data-price-key="${esc(figKey(fig.no))}">${priceHtml(figKey(fig.no))}</div>
+            <div class="missing-cost" data-no="${esc(fig.no)}">${missingCostHtml(fig)}</div>
             ${ev.missing.length ? `<div class="mt-1">${ev.missing.map(p => chip(p, 'missing')).join('')}</div>` : ''}
             <details class="fig-parts">
               <summary>Delar jag har (${ev.have.length})</summary>
@@ -128,6 +230,10 @@ function render() {
         </div>
       </div></div>`;
   }).join('') || '<p class="text-muted">Inga figurer matchar filtret ännu.</p>';
+
+  // Figurpriser först, sedan saknade delar
+  requestPrices(rows.map(r => ({ type: 'MINIFIG', no: r.fig.no, color_id: 0 })));
+  requestPrices(rows.flatMap(r => r.ev.missing));
 }
 
 async function run() {
@@ -195,5 +301,6 @@ async function run() {
 document.getElementById('runBtn').addEventListener('click', run);
 document.getElementById('maxMissing').addEventListener('change', render);
 document.getElementById('figFilter').addEventListener('input', render);
+document.getElementById('sortBy').addEventListener('change', render);
 </script>
 {% endblock %}

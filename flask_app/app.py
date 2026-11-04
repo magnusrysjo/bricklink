@@ -52,13 +52,15 @@ def get_db():
 CATALOG_CACHE_SECONDS = 30 * 24 * 3600
 
 
-def cached_catalog(key, fetch):
+def cached_catalog(key, fetch, max_age=None):
     """Katalogdata ändras sällan; cacha i SQLite för att spara på BrickLinks API-kvot."""
+    if max_age is None:
+        max_age = CATALOG_CACHE_SECONDS
     db = get_db()
     try:
         row = db.execute("SELECT data, fetched_at FROM api_cache WHERE cache_key = ?",
                          (key,)).fetchone()
-        if row and time.time() - row[1] < CATALOG_CACHE_SECONDS:
+        if row and time.time() - row[1] < max_age:
             return json.loads(row[0])
         data = fetch()
         db.execute("INSERT OR REPLACE INTO api_cache (cache_key, data, fetched_at) VALUES (?, ?, ?)",
@@ -70,6 +72,28 @@ def cached_catalog(key, fetch):
 
 
 MAX_FIGS_PER_PART = 25
+PRICE_CACHE_SECONDS = 7 * 24 * 3600
+
+
+@app.route("/api/catalog_price/<item_type>/<path:item_no>")
+def api_catalog_price(item_type, item_no):
+    """Genomsnittligt försäljningspris (begagnad) för en artikel i en färg, cachat en vecka."""
+    color_id = request.args.get("color_id", type=int) or None
+    try:
+        data = cached_catalog(
+            f"price:{item_type}:{item_no}:{color_id or 0}:U",
+            lambda: bl.get_price_guide(item_type, item_no, color_id, "U"),
+            max_age=PRICE_CACHE_SECONDS,
+        )
+        avg = data.get("avg_price")
+        avg = float(avg) if avg not in (None, "") else 0.0
+        return jsonify({
+            "avg_price": avg or None,
+            "currency": data.get("currency_code", ""),
+            "sold": data.get("total_quantity") or 0,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/minifigs")
