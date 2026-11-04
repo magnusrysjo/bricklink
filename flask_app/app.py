@@ -111,11 +111,15 @@ def api_minifig_seeds():
         return jsonify({"error": str(e)}), 500
 
     stock = defaultdict(int)
+    stockroom = defaultdict(int)  # del av stock som ligger i Stockroom
     seeds = {}
     for entry in inventory:
         item = entry.get("item", {})
         itype, no, color_id = item.get("type"), item.get("no"), entry.get("color_id", 0)
-        stock[f"{itype}|{no}|{color_id}"] += entry.get("quantity", 0)
+        key = f"{itype}|{no}|{color_id}"
+        stock[key] += entry.get("quantity", 0)
+        if entry.get("is_stock_room"):
+            stockroom[key] += entry.get("quantity", 0)
         if itype == "PART" and "torso" in entry.get("category_name", "").lower():
             seeds[(no, color_id)] = {
                 "no": no,
@@ -123,7 +127,7 @@ def api_minifig_seeds():
                 "color_name": entry.get("color_name", ""),
                 "name": item.get("name", ""),
             }
-    return jsonify({"seeds": list(seeds.values()), "stock": stock})
+    return jsonify({"seeds": list(seeds.values()), "stock": stock, "stockroom": stockroom})
 
 
 @app.route("/api/minifigs/for_part/<path:part_no>")

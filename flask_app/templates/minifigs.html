@@ -98,6 +98,12 @@
   .part-chip.have { border-color: #a3cfbb; background: #f3faf6; }
   .fig-parts { margin-top: 4px; }
   .fig-parts summary { cursor: pointer; font-size: .85rem; color: #6c757d; }
+  .loc-tag {
+    display: inline-block; padding: 0 .4rem; border-radius: 999px; font-size: .68rem;
+    font-weight: 600; white-space: nowrap; margin-left: 2px; vertical-align: 1px;
+  }
+  .loc-sale { color: #146c43; background: #d1e7dd; border: 1px solid #a3cfbb; }
+  .loc-room { color: #055160; background: #cff4fc; border: 1px solid #9eeaf9; }
 </style>
 
 <script>
@@ -107,6 +113,7 @@ const prices = new Map();     // "TYP|nr|färg" -> {avg_price, currency, sold} |
 const priceQueue = [];
 let priceWorkers = 0;
 let stock = {};
+let stockroom = {};   // del av stock som ligger i Stockroom
 let colorNames = {};
 
 const pkey = (type, no, color) => `${type}|${no}|${color || 0}`;
@@ -215,13 +222,26 @@ function chip(p, cls) {
   const owned = stockOf(p);
   const qty = p.quantity > 1 ? `${p.quantity}× ` : '';
   const stockNote = cls === 'missing' && owned ? ` (har ${owned})` : '';
+  const tags = owned ? locationTags(p) : '';
   const price = cls === 'missing'
     ? ` · <span class="part-price" data-price-key="${esc(pkey(p.type, p.no, p.color_id))}">${partPriceHtml(pkey(p.type, p.no, p.color_id))}</span>`
     : '';
   return `<span class="part-chip ${cls}" title="${esc(p.name)}">
       <img src="${partImg(p)}" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
-      <span>${qty}<strong>${esc(p.no)}</strong>${color ? ' · ' + esc(color) : ''}${stockNote}${price}</span>
+      <span>${qty}<strong>${esc(p.no)}</strong>${color ? ' · ' + esc(color) : ''}${stockNote}${price}${tags}</span>
     </span>`;
+}
+
+// Var delarna ligger: i butiken (till salu) och/eller i Stockroom
+function locationTags(p) {
+  const key = `${p.type}|${p.no}|${p.color_id}`;
+  const total = stock[key] || 0;
+  const room = Math.min(stockroom[key] || 0, total);
+  const sale = total - room;
+  let html = '';
+  if (sale) html += ` <span class="loc-tag loc-sale" title="${sale} st till salu i butiken">Butik ${sale}</span>`;
+  if (room) html += ` <span class="loc-tag loc-room" title="${room} st i Stockroom">Stockroom ${room}</span>`;
+  return html;
 }
 
 function render() {
@@ -299,6 +319,7 @@ async function run() {
     const seedData = await seedResp.json();
     if (seedData.error) throw new Error(seedData.error);
     stock = seedData.stock;
+    stockroom = seedData.stockroom || {};
     const colors = await colorResp.json();
     if (Array.isArray(colors)) colors.forEach(c => { colorNames[c.color_id] = c.color_name; });
 
