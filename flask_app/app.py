@@ -1,5 +1,8 @@
 import os
 import hmac
+import html
+import json
+import time
 import sqlite3
 from collections import defaultdict
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
@@ -38,7 +41,111 @@ def get_db():
     db.execute("""CREATE TABLE IF NOT EXISTS hidden_colors (
         color_id INTEGER PRIMARY KEY
     )""")
+    db.execute("""CREATE TABLE IF NOT EXISTS api_cache (
+        cache_key TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        fetched_at REAL NOT NULL
+    )""")
     return db
+
+
+CATALOG_CACHE_SECONDS = 30 * 24 * 3600
+
+
+def cached_catalog(key, fetch):
+    """Katalogdata ändras sällan; cacha i SQLite för att spara på BrickLinks API-kvot."""
+    db = get_db()
+    try:
+        row = db.execute("SELECT data, fetched_at FROM api_cache WHERE cache_key = ?",
+                         (key,)).fetchone()
+        if row and time.time() - row[1] < CATALOG_CACHE_SECONDS:
+            return json.loads(row[0])
+        data = fetch()
+        db.execute("INSERT OR REPLACE INTO api_cache (cache_key, data, fetched_at) VALUES (?, ?, ?)",
+                   (key, json.dumps(data), time.time()))
+        db.commit()
+        return data
+    finally:
+        db.close()
+
+
+MAX_FIGS_PER_PART = 25
+
+
+@app.route("/minifigs")
+def minifigs():
+    return render_template("minifigs.html", max_figs=MAX_FIGS_PER_PART)
+
+
+@app.route("/api/minifigs/seeds")
+def api_minifig_seeds():
+    """Lagersaldo per del och färg, plus de torsos analysen utgår från."""
+    try:
+        inventory = bl.get_inventory()
+        bl.enrich_with_category_names(inventory)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    stock = defaultdict(int)
+    seeds = {}
+    for entry in inventory:
+        item = entry.get("item", {})
+        itype, no, color_id = item.get("type"), item.get("no"), entry.get("color_id", 0)
+        stock[f"{itype}|{no}|{color_id}"] += entry.get("quantity", 0)
+        if itype == "PART" and "torso" in entry.get("category_name", "").lower():
+            seeds[(no, color_id)] = {
+                "no": no,
+                "color_id": color_id,
+                "color_name": entry.get("color_name", ""),
+                "name": item.get("name", ""),
+            }
+    return jsonify({"seeds": list(seeds.values()), "stock": stock})
+
+
+@app.route("/api/minifigs/for_part/<path:part_no>")
+def api_minifigs_for_part(part_no):
+    """Minifigurer som innehåller delen, med sina dellistor."""
+    color_id = request.args.get("color_id", type=int)
+    try:
+        supersets = cached_catalog(
+            f"supersets:PART:{part_no}:{color_id}",
+            lambda: bl.get_supersets("PART", part_no, color_id),
+        )
+        figs = {}
+        for group in supersets:
+            for entry in group.get("entries", []):
+                item = entry.get("item", {})
+                if item.get("type") == "MINIFIG" and item.get("no") not in figs:
+                    figs[item["no"]] = html.unescape(item.get("name", ""))
+
+        result = []
+        for fig_no, fig_name in list(figs.items())[:MAX_FIGS_PER_PART]:
+            subsets = cached_catalog(
+                f"subsets:MINIFIG:{fig_no}",
+                lambda n=fig_no: bl.get_subsets("MINIFIG", n),
+            )
+            groups = []
+            for group in subsets:
+                options = [
+                    {
+                        "type": e.get("item", {}).get("type"),
+                        "no": e.get("item", {}).get("no"),
+                        "name": html.unescape(e.get("item", {}).get("name", "")),
+                        "color_id": e.get("color_id", 0),
+                        "quantity": e.get("quantity", 1),
+                        "alternate": bool(e.get("is_alternate")),
+                    }
+                    for e in group.get("entries", [])
+                    if not e.get("is_counterpart")
+                ]
+                if options:
+                    # Huvuddelen först, alternativ efter
+                    options.sort(key=lambda o: o["alternate"])
+                    groups.append(options)
+            result.append({"no": fig_no, "name": fig_name, "groups": groups})
+        return jsonify({"figs": result, "truncated": len(figs) > MAX_FIGS_PER_PART})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/settings")

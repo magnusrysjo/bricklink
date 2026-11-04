@@ -51,6 +51,25 @@ def get_item(item_type, item_no):
     return resp.json().get("data", {})
 
 
+def get_supersets(item_type, item_no, color_id=None):
+    """Vilka artiklar (set, minifigurer …) en artikel ingår i."""
+    session = get_session()
+    params = {}
+    if color_id is not None:
+        params["color_id"] = color_id
+    resp = session.get(f"{BASE_URL}/items/{item_type}/{item_no}/supersets", params=params)
+    resp.raise_for_status()
+    return resp.json().get("data", [])
+
+
+def get_subsets(item_type, item_no):
+    """Vilka delar en artikel består av, grupperat med eventuella alternativ."""
+    session = get_session()
+    resp = session.get(f"{BASE_URL}/items/{item_type}/{item_no}/subsets")
+    resp.raise_for_status()
+    return resp.json().get("data", [])
+
+
 def get_price_guide(item_type, item_no, color_id, condition="N"):
     session = get_session()
     params = {"guide_type": "sold", "new_or_used": condition}

@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Minifigurer – BrickLink{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+  <h2 class="mb-0">Bygg minifigurer</h2>
+  <button class="btn btn-danger" id="runBtn">Analysera mitt lager</button>
+</div>
+<p class="text-muted">
+  Utgår från de torsos du har i lager, slår upp vilka minifigurer de ingår i och jämför
+  figurernas dellistor mot ditt inventory. Katalogsvar sparas i 30 dagar, så en ny
+  analys går snabbt och kostar få API-anrop.
+</p>
+
+<div id="progressBox" class="mb-3" style="display:none">
+  <div class="progress" style="height:8px">
+    <div id="progressBar" class="progress-bar bg-danger" style="width:0%"></div>
+  </div>
+  <small id="progressText" class="text-muted"></small>
+</div>
+
+<div id="filters" class="d-flex flex-wrap align-items-center gap-3 mb-3" style="display:none !important">
+  <label class="d-flex align-items-center gap-2 mb-0">
+    Saknade delar högst
+    <select id="maxMissing" class="form-select form-select-sm" style="width:auto">
+      <option value="0">0 (kompletta)</option>
+      <option value="1">1</option>
+      <option value="2" selected>2</option>
+      <option value="3">3</option>
+      <option value="99">alla</option>
+    </select>
+  </label>
+  <input type="text" id="figFilter" class="form-control form-control-sm" placeholder="Filtrera på namn eller nummer…" style="max-width:260px">
+  <span id="resultCount" class="text-muted small"></span>
+</div>
+
+<div id="results"></div>
+
+<style>
+  .fig-card { display: flex; gap: 14px; align-items: flex-start; }
+  .fig-img { width: 72px; height: 88px; object-fit: contain; flex-shrink: 0; }
+  .part-chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px 2px 2px;
+    border-radius: 6px; font-size: .8rem; margin: 2px 4px 2px 0; border: 1px solid #dee2e6;
+    background: #fff;
+  }
+  .part-chip img { width: 32px; height: 32px; object-fit: contain; }
+  .part-chip.missing { border-color: #f1aeb5; background: #fff5f5; }
+  .part-chip.have { border-color: #a3cfbb; background: #f3faf6; }
+  .fig-parts { margin-top: 4px; }
+  .fig-parts summary { cursor: pointer; font-size: .85rem; color: #6c757d; }
+</style>
+
+<script>
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+const figs = new Map();       // figurnummer -> {no, name, groups, viaTorso}
+let stock = {};
+let colorNames = {};
+
+function partImg(p) {
+  if (p.type === 'MINIFIG') return `https://img.bricklink.com/M/${encodeURIComponent(p.no)}.jpg`;
+  return `https://img.bricklink.com/P/${p.color_id}/${encodeURIComponent(p.no)}.jpg`;
+}
+function stockOf(p) {
+  return stock[`${p.type}|${p.no}|${p.color_id}`] || 0;
+}
+
+// En grupp är uppfylld om huvuddelen eller något alternativ finns i tillräckligt antal
+function evaluate(fig) {
+  const missing = [], have = [];
+  for (const group of fig.groups) {
+    const ok = group.find(o => stockOf(o) >= o.quantity);
+    if (ok) have.push(ok);
+    else missing.push(group[0]);
+  }
+  return { missing, have, total: fig.groups.length };
+}
+
+function chip(p, cls) {
+  const color = colorNames[p.color_id];
+  const owned = stockOf(p);
+  const qty = p.quantity > 1 ? `${p.quantity}× ` : '';
+  const stockNote = cls === 'missing' && owned ? ` (har ${owned})` : '';
+  return `<span class="part-chip ${cls}" title="${esc(p.name)}">
+      <img src="${partImg(p)}" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
+      <span>${qty}<strong>${esc(p.no)}</strong>${color ? ' · ' + esc(color) : ''}${stockNote}</span>
+    </span>`;
+}
+
+function render() {
+  const maxMissing = Number(document.getElementById('maxMissing').value);
+  const q = document.getElementById('figFilter').value.trim().toLowerCase();
+  const rows = [];
+  for (const fig of figs.values()) {
+    if (!fig.groups.length) continue;
+    const ev = evaluate(fig);
+    if (ev.missing.length > maxMissing) continue;
+    if (q && !fig.name.toLowerCase().includes(q) && !fig.no.toLowerCase().includes(q)) continue;
+    rows.push({ fig, ev });
+  }
+  rows.sort((a, b) => a.ev.missing.length - b.ev.missing.length || a.fig.name.localeCompare(b.fig.name, 'sv'));
+
+  document.getElementById('resultCount').textContent =
+    `${rows.length} figurer visas · ${[...figs.values()].filter(f => f.groups.length && !evaluate(f).missing.length).length} kompletta totalt`;
+
+  document.getElementById('results').innerHTML = rows.map(({ fig, ev }) => {
+    const owned = stock[`MINIFIG|${fig.no}|0`] || 0;
+    const status = ev.missing.length === 0
+      ? '<span class="badge bg-success">Komplett</span>'
+      : `<span class="badge bg-warning text-dark">Saknar ${ev.missing.length}</span>`;
+    return `
+      <div class="card shadow-sm mb-2"><div class="card-body py-2">
+        <div class="fig-card">
+          <img class="fig-img" src="${partImg({type:'MINIFIG', no: fig.no})}" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
+          <div class="flex-grow-1">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <a href="https://www.bricklink.com/v2/catalog/catalogitem.page?M=${encodeURIComponent(fig.no)}" target="_blank" rel="noopener"><strong>${esc(fig.no)}</strong></a>
+              ${status}
+              <span class="text-muted small">${ev.total - ev.missing.length}/${ev.total} delar</span>
+              ${owned ? `<span class="badge bg-secondary">${owned} st som hel figur i lager</span>` : ''}
+            </div>
+            <div>${esc(fig.name)}</div>
+            ${ev.missing.length ? `<div class="mt-1">${ev.missing.map(p => chip(p, 'missing')).join('')}</div>` : ''}
+            <details class="fig-parts">
+              <summary>Delar jag har (${ev.have.length})</summary>
+              ${ev.have.map(p => chip(p, 'have')).join('')}
+            </details>
+          </div>
+        </div>
+      </div></div>`;
+  }).join('') || '<p class="text-muted">Inga figurer matchar filtret ännu.</p>';
+}
+
+async function run() {
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  figs.clear();
+  document.getElementById('results').innerHTML = '';
+  const box = document.getElementById('progressBox');
+  const bar = document.getElementById('progressBar');
+  const text = document.getElementById('progressText');
+  box.style.display = '';
+  text.textContent = 'Hämtar lager…';
+  bar.style.width = '0%';
+
+  try {
+    const [seedResp, colorResp] = await Promise.all([
+      fetch('/api/minifigs/seeds'), fetch('/api/colors')
+    ]);
+    const seedData = await seedResp.json();
+    if (seedData.error) throw new Error(seedData.error);
+    stock = seedData.stock;
+    const colors = await colorResp.json();
+    if (Array.isArray(colors)) colors.forEach(c => { colorNames[c.color_id] = c.color_name; });
+
+    const seeds = seedData.seeds;
+    if (!seeds.length) {
+      text.textContent = 'Hittade inga torsos i lagret (letar i kategorier vars namn innehåller "Torso").';
+      return;
+    }
+    document.getElementById('filters').style.setProperty('display', 'flex', 'important');
+
+    let done = 0, failed = 0, truncated = 0;
+    const queue = [...seeds];
+    async function worker() {
+      while (queue.length) {
+        const seed = queue.shift();
+        try {
+          const r = await fetch(`/api/minifigs/for_part/${encodeURIComponent(seed.no)}?color_id=${seed.color_id}`);
+          const d = await r.json();
+          if (d.error) throw new Error(d.error);
+          if (d.truncated) truncated++;
+          d.figs.forEach(f => { if (!figs.has(f.no)) figs.set(f.no, f); });
+        } catch (err) {
+          failed++;
+          console.error('Torso', seed.no, err);
+        }
+        done++;
+        bar.style.width = `${Math.round(done / seeds.length * 100)}%`;
+        text.textContent = `Torso ${done} av ${seeds.length} · ${figs.size} figurer hittade` +
+          (failed ? ` · ${failed} misslyckades` : '');
+        render();
+      }
+    }
+    await Promise.all([worker(), worker(), worker()]);
+    text.textContent = `Klart: ${seeds.length} torsos, ${figs.size} figurer.` +
+      (failed ? ` ${failed} torsos kunde inte hämtas (se konsolen).` : '') +
+      (truncated ? ` ${truncated} torsos ingår i fler än {{ max_figs }} figurer, och bara de första togs med.` : '');
+  } catch (err) {
+    text.textContent = 'Fel: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('runBtn').addEventListener('click', run);
+document.getElementById('maxMissing').addEventListener('change', render);
+document.getElementById('figFilter').addEventListener('input', render);
+</script>
+{% endblock %}
