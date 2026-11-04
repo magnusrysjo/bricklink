@@ -144,11 +144,13 @@ def api_minifigs_for_part(part_no):
             for entry in group.get("entries", []):
                 item = entry.get("item", {})
                 if item.get("type") == "MINIFIG" and item.get("no") not in figs:
-                    figs[item["no"]] = html.unescape(item.get("name", ""))
+                    figs[item["no"]] = (html.unescape(item.get("name", "")), item.get("category_id"))
 
         result = []
-        for fig_no, fig_name in list(figs.items())[:MAX_FIGS_PER_PART]:
-            result.append({"no": fig_no, "name": fig_name, "groups": fig_part_groups(fig_no)})
+        for fig_no, (fig_name, category_id) in list(figs.items())[:MAX_FIGS_PER_PART]:
+            theme, subtheme = bl.category_theme(category_id)
+            result.append({"no": fig_no, "name": fig_name, "theme": theme, "subtheme": subtheme,
+                           "groups": fig_part_groups(fig_no)})
         return jsonify({"figs": result, "truncated": len(figs) > MAX_FIGS_PER_PART})
     except Exception as e:
         return jsonify({"error": str(e)}), 500

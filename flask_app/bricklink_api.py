@@ -3,6 +3,7 @@ import html
 from requests_oauthlib import OAuth1Session
 
 _category_cache: dict[int, str] = {}
+_category_parent: dict[int, int] = {}
 _categories_loaded = False
 _colors_cache: list = []
 _colors_loaded = False
@@ -30,10 +31,26 @@ def _load_all_categories():
         resp = session.get(f"{BASE_URL}/categories")
         resp.raise_for_status()
         for cat in resp.json().get("data", []):
-            _category_cache[cat["category_id"]] = cat["category_name"]
+            _category_cache[cat["category_id"]] = html.unescape(cat["category_name"])
+            _category_parent[cat["category_id"]] = cat.get("parent_id") or 0
         _categories_loaded = True
     except Exception:
         pass
+
+
+def category_theme(category_id):
+    """(tema, underkategori) för en kategori: tema är toppkategorin, t.ex. "Star Wars"."""
+    _load_all_categories()
+    if not category_id or category_id not in _category_cache:
+        return "Övrigt", ""
+    chain, cid, seen = [], category_id, set()
+    while cid and cid in _category_cache and cid not in seen:
+        seen.add(cid)
+        chain.append(_category_cache[cid])
+        cid = _category_parent.get(cid, 0)
+    theme = chain[-1]
+    sub = " / ".join(reversed(chain[:-1]))
+    return theme, sub
 
 
 def enrich_with_category_names(inventory: list) -> None:
