@@ -11,6 +11,49 @@
   analys går snabbt och kostar få API-anrop.
 </p>
 
+<div class="card shadow-sm mb-4" id="addFigCard">
+  <div class="card-body">
+    <h5 class="card-title mb-2">Lägg till delar från en minifigur i Stockroom</h5>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <input type="text" id="addFigNo" class="form-control form-control-sm" placeholder="Minifigurnummer, t.ex. sw0001a" style="max-width:240px">
+      <button class="btn btn-sm btn-outline-secondary" id="addFigSearch">Sök</button>
+      <span id="addFigStatus" class="small text-muted"></span>
+    </div>
+    <div id="addFigBody" class="mt-3" style="display:none">
+      <div class="d-flex align-items-center gap-3 mb-2">
+        <img id="addFigImg" class="fig-img" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
+        <div>
+          <strong id="addFigTitle"></strong><br>
+          <span id="addFigName"></span>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-2" id="addFigTable">
+          <thead class="table-light">
+            <tr>
+              <th style="width:36px"><input type="checkbox" class="form-check-input" id="addFigAll" checked title="Markera alla"></th>
+              <th style="width:48px"></th>
+              <th>Del</th>
+              <th style="width:80px">Antal</th>
+              <th style="width:110px">Skick</th>
+              <th style="width:100px">Pris</th>
+              <th style="width:40px"></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <input type="text" id="addFigRemarks" class="form-control form-control-sm" style="max-width:240px" placeholder="Anmärkning">
+        <button class="btn btn-sm btn-danger" id="addFigSubmit">Lägg till valda i Stockroom</button>
+        <span id="addFigResult" class="small"></span>
+      </div>
+      <div class="form-text">Varje del skapas som en egen lagerpost i Stockroom A, så den syns inte i butiken.
+        Finns delen redan i lager blir det en ny post bredvid den gamla.</div>
+    </div>
+  </div>
+</div>
+
 <div id="progressBox" class="mb-3" style="display:none">
   <div class="progress" style="height:8px">
     <div id="progressBar" class="progress-bar bg-danger" style="width:0%"></div>
@@ -217,6 +260,7 @@ function render() {
               ${status}
               <span class="text-muted small">${ev.total - ev.missing.length}/${ev.total} delar</span>
               ${owned ? `<span class="badge bg-secondary">${owned} st som hel figur i lager</span>` : ''}
+              <button type="button" class="btn btn-link btn-sm p-0 ms-auto add-fig-parts" data-no="${esc(fig.no)}">Lägg till delar →</button>
             </div>
             <div>${esc(fig.name)}</div>
             <div class="fig-price" data-price-key="${esc(figKey(fig.no))}">${priceHtml(figKey(fig.no))}</div>
@@ -302,5 +346,195 @@ document.getElementById('runBtn').addEventListener('click', run);
 document.getElementById('maxMissing').addEventListener('change', render);
 document.getElementById('figFilter').addEventListener('input', render);
 document.getElementById('sortBy').addEventListener('change', render);
+
+// ---- Lägg till delar från en minifigur i Stockroom ----
+const addFig = {
+  no: null,
+  groups: [],
+  tbody: document.querySelector('#addFigTable tbody'),
+  status: document.getElementById('addFigStatus'),
+};
+
+async function ensureColors() {
+  if (Object.keys(colorNames).length) return;
+  try {
+    const colors = await (await fetch('/api/colors')).json();
+    if (Array.isArray(colors)) colors.forEach(c => { colorNames[c.color_id] = c.color_name; });
+  } catch {}
+}
+
+function addFigRowHtml(group, gi) {
+  const p = group[0];
+  const alt = group.length > 1
+    ? `<select class="form-select form-select-sm mt-1 af-alt" title="Alternativ del" style="max-width:220px">
+         ${group.map((o, oi) => `<option value="${oi}">${esc(o.no)}${o.alternate ? ' (alternativ)' : ''}</option>`).join('')}
+       </select>` : '';
+  return `
+    <tr data-gi="${gi}">
+      <td><input type="checkbox" class="form-check-input af-check" checked></td>
+      <td><img class="af-img" src="${partImg(p)}" width="40" height="40" style="object-fit:contain" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"></td>
+      <td>
+        <strong class="af-no">${esc(p.no)}</strong>
+        <span class="text-muted af-color">${esc(colorNames[p.color_id] || '')}</span><br>
+        <small class="text-muted af-name">${esc(p.name)}</small>
+        ${alt}
+      </td>
+      <td><input type="number" class="form-control form-control-sm af-qty" min="1" value="${p.quantity}"></td>
+      <td>
+        <select class="form-select form-select-sm af-cond">
+          <option value="N">Ny</option>
+          <option value="U" selected>Begagnad</option>
+        </select>
+      </td>
+      <td><input type="text" class="form-control form-control-sm af-price" placeholder="Hämtar…"></td>
+      <td class="af-state small"></td>
+    </tr>`;
+}
+
+function selectedPart(tr) {
+  const group = addFig.groups[Number(tr.dataset.gi)];
+  const altSel = tr.querySelector('.af-alt');
+  return group[altSel ? Number(altSel.value) : 0];
+}
+
+async function fillPrice(tr) {
+  const p = selectedPart(tr);
+  const input = tr.querySelector('.af-price');
+  input.value = '';
+  input.placeholder = 'Hämtar…';
+  try {
+    const d = await (await fetch(`/api/catalog_price/${p.type}/${encodeURIComponent(p.no)}?color_id=${p.color_id || 0}`)).json();
+    if (selectedPart(tr) !== p) return;  // användaren hann byta alternativ
+    input.placeholder = d.avg_price ? 'Pris' : 'Ange pris';
+    if (d.avg_price) input.value = d.avg_price.toFixed(2);
+  } catch {
+    input.placeholder = 'Ange pris';
+  }
+}
+
+async function searchFig(no) {
+  no = (no || '').trim();
+  if (!no) return;
+  document.getElementById('addFigNo').value = no;
+  addFig.status.textContent = 'Söker…';
+  addFig.status.className = 'small text-muted';
+  document.getElementById('addFigBody').style.display = 'none';
+  document.getElementById('addFigResult').textContent = '';
+  try {
+    const [resp] = await Promise.all([fetch(`/api/minifigs/parts/${encodeURIComponent(no)}`), ensureColors()]);
+    const d = await resp.json();
+    if (d.error) throw new Error(d.error);
+    addFig.no = d.no;
+    addFig.groups = d.groups;
+    addFig.status.textContent = '';
+    document.getElementById('addFigImg').src = partImg({ type: 'MINIFIG', no: d.no });
+    document.getElementById('addFigImg').style.visibility = '';
+    document.getElementById('addFigTitle').textContent = d.no;
+    document.getElementById('addFigName').textContent = d.name;
+    document.getElementById('addFigAll').checked = true;
+    document.getElementById('addFigRemarks').value = `${new Date().toISOString().slice(0, 10)} från ${d.no}`;
+    addFig.tbody.innerHTML = d.groups.map(addFigRowHtml).join('') ||
+      '<tr><td colspan="7" class="text-muted">BrickLink har ingen dellista för den här figuren.</td></tr>';
+    document.getElementById('addFigBody').style.display = '';
+    addFig.tbody.querySelectorAll('tr[data-gi]').forEach(fillPrice);
+  } catch (err) {
+    addFig.status.textContent = err.message;
+    addFig.status.className = 'small text-danger';
+  }
+}
+
+document.getElementById('addFigSearch').addEventListener('click', () => searchFig(document.getElementById('addFigNo').value));
+document.getElementById('addFigNo').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); searchFig(e.target.value); }
+});
+
+addFig.tbody.addEventListener('change', e => {
+  const tr = e.target.closest('tr[data-gi]');
+  if (!tr) return;
+  if (e.target.classList.contains('af-alt')) {
+    const p = selectedPart(tr);
+    tr.querySelector('.af-no').textContent = p.no;
+    tr.querySelector('.af-color').textContent = colorNames[p.color_id] || '';
+    tr.querySelector('.af-name').textContent = p.name;
+    tr.querySelector('.af-img').src = partImg(p);
+    tr.querySelector('.af-qty').value = p.quantity;
+    fillPrice(tr);
+  }
+  if (e.target.classList.contains('af-check')) {
+    tr.classList.toggle('text-muted', !e.target.checked);
+  }
+});
+
+document.getElementById('addFigAll').addEventListener('change', e => {
+  addFig.tbody.querySelectorAll('.af-check').forEach(cb => {
+    cb.checked = e.target.checked;
+    cb.closest('tr').classList.toggle('text-muted', !cb.checked);
+  });
+});
+
+document.getElementById('addFigSubmit').addEventListener('click', async (e) => {
+  const btn = e.target;
+  const result = document.getElementById('addFigResult');
+  const rows = [...addFig.tbody.querySelectorAll('tr[data-gi]')]
+    .filter(tr => tr.querySelector('.af-check').checked && !tr.dataset.done);
+  if (!rows.length) { result.textContent = 'Inga valda delar att lägga till.'; result.className = 'small text-muted'; return; }
+
+  const missingPrice = rows.filter(tr => !tr.querySelector('.af-price').value.trim());
+  if (missingPrice.length) {
+    missingPrice.forEach(tr => tr.querySelector('.af-price').classList.add('is-invalid'));
+    result.textContent = `${missingPrice.length} valda delar saknar pris.`;
+    result.className = 'small text-danger';
+    return;
+  }
+
+  btn.disabled = true;
+  const remarks = document.getElementById('addFigRemarks').value;
+  let ok = 0, failed = 0;
+  for (const tr of rows) {
+    const p = selectedPart(tr);
+    const state = tr.querySelector('.af-state');
+    tr.querySelector('.af-price').classList.remove('is-invalid');
+    state.textContent = '…';
+    try {
+      const resp = await fetch('/api/inventory', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          item_no: p.no,
+          item_type: p.type,
+          color_id: p.color_id || 0,
+          quantity: tr.querySelector('.af-qty').value,
+          unit_price: tr.querySelector('.af-price').value.trim().replace(',', '.'),
+          condition: tr.querySelector('.af-cond').value,
+          remarks,
+          stock_room: true,
+        })
+      });
+      const d = await resp.json().catch(() => ({}));
+      if (!resp.ok || d.error) throw new Error(d.error || resp.statusText);
+      ok++;
+      tr.dataset.done = '1';
+      state.textContent = '✓';
+      state.className = 'af-state small text-success';
+      tr.querySelectorAll('input, select').forEach(el => { el.disabled = true; });
+    } catch (err) {
+      failed++;
+      state.textContent = '✗';
+      state.title = err.message;
+      state.className = 'af-state small text-danger';
+    }
+  }
+  btn.disabled = false;
+  result.textContent = `${ok} delar tillagda i Stockroom` + (failed ? `, ${failed} misslyckades (hovra över ✗ för orsak)` : '.');
+  result.className = 'small ' + (failed ? 'text-danger' : 'text-success');
+});
+
+// "Lägg till delar" från ett resultatkort i analysen
+document.getElementById('results').addEventListener('click', e => {
+  const btn = e.target.closest('.add-fig-parts');
+  if (!btn) return;
+  searchFig(btn.dataset.no);
+  document.getElementById('addFigCard').scrollIntoView({ behavior: 'smooth' });
+});
 </script>
 {% endblock %}

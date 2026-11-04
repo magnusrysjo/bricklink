@@ -124,7 +124,7 @@ def get_inventory_item(inventory_id):
 
 
 def update_inventory_item(inventory_id, quantity=None, unit_price=None, description=None,
-                          remarks=None, new_or_used=None):
+                          remarks=None, new_or_used=None, is_stock_room=None):
     session = get_session()
     body = {}
     if quantity is not None:
@@ -142,6 +142,10 @@ def update_inventory_item(inventory_id, quantity=None, unit_price=None, descript
         body["remarks"] = remarks
     if new_or_used is not None:
         body["new_or_used"] = new_or_used
+    if is_stock_room is not None:
+        body["is_stock_room"] = bool(is_stock_room)
+        if is_stock_room:
+            body["stock_room_id"] = "A"
     if not body:
         return get_inventory_item(inventory_id)
     resp = session.put(f"{BASE_URL}/inventories/{inventory_id}", json=body)
@@ -186,7 +190,7 @@ def get_order_items(order_id):
 
 
 def create_inventory_item(item_no, item_type, color_id, quantity, unit_price,
-                           condition="N", description="", remarks=""):
+                           condition="N", description="", remarks="", stock_room=False):
     session = get_session()
     body = {
         "item": {"no": item_no, "type": item_type},
@@ -197,8 +201,10 @@ def create_inventory_item(item_no, item_type, color_id, quantity, unit_price,
         "description": description,
         "remarks": remarks,
         "is_retain": False,
-        "is_stock_room": False,
+        "is_stock_room": bool(stock_room),
     }
+    if stock_room:
+        body["stock_room_id"] = "A"
     resp = session.post(f"{BASE_URL}/inventories", json=body)
     if not resp.ok:
         raise RuntimeError(f"BrickLink {resp.status_code}: {resp.text}")

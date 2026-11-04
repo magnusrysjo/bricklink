@@ -144,32 +144,56 @@ def api_minifigs_for_part(part_no):
 
         result = []
         for fig_no, fig_name in list(figs.items())[:MAX_FIGS_PER_PART]:
-            subsets = cached_catalog(
-                f"subsets:MINIFIG:{fig_no}",
-                lambda n=fig_no: bl.get_subsets("MINIFIG", n),
-            )
-            groups = []
-            for group in subsets:
-                options = [
-                    {
-                        "type": e.get("item", {}).get("type"),
-                        "no": e.get("item", {}).get("no"),
-                        "name": html.unescape(e.get("item", {}).get("name", "")),
-                        "color_id": e.get("color_id", 0),
-                        "quantity": e.get("quantity", 1),
-                        "alternate": bool(e.get("is_alternate")),
-                    }
-                    for e in group.get("entries", [])
-                    if not e.get("is_counterpart")
-                ]
-                if options:
-                    # Huvuddelen först, alternativ efter
-                    options.sort(key=lambda o: o["alternate"])
-                    groups.append(options)
-            result.append({"no": fig_no, "name": fig_name, "groups": groups})
+            result.append({"no": fig_no, "name": fig_name, "groups": fig_part_groups(fig_no)})
         return jsonify({"figs": result, "truncated": len(figs) > MAX_FIGS_PER_PART})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+def fig_part_groups(fig_no):
+    """En minifigurs delar som grupper: huvuddelen först, eventuella alternativ efter."""
+    subsets = cached_catalog(
+        f"subsets:MINIFIG:{fig_no}",
+        lambda: bl.get_subsets("MINIFIG", fig_no),
+    )
+    groups = []
+    for group in subsets:
+        options = [
+            {
+                "type": e.get("item", {}).get("type"),
+                "no": e.get("item", {}).get("no"),
+                "name": html.unescape(e.get("item", {}).get("name", "")),
+                "color_id": e.get("color_id", 0),
+                "quantity": e.get("quantity", 1),
+                "alternate": bool(e.get("is_alternate")),
+            }
+            for e in group.get("entries", [])
+            if not e.get("is_counterpart")
+        ]
+        if options:
+            options.sort(key=lambda o: o["alternate"])
+            groups.append(options)
+    return groups
+
+
+@app.route("/api/minifigs/parts/<path:fig_no>")
+def api_minifig_parts(fig_no):
+    """Sök en enskild minifigur: namn och dellista."""
+    fig_no = fig_no.strip()
+    try:
+        item = cached_catalog(f"item:MINIFIG:{fig_no}", lambda: bl.get_item("MINIFIG", fig_no))
+        if not item or not item.get("name"):
+            return jsonify({"error": f"Hittade ingen minifigur med nummer {fig_no}"}), 404
+        return jsonify({
+            "no": item.get("no", fig_no),
+            "name": html.unescape(item.get("name", "")),
+            "groups": fig_part_groups(item.get("no", fig_no)),
+        })
+    except Exception as e:
+        msg = str(e)
+        if "404" in msg:
+            return jsonify({"error": f"Hittade ingen minifigur med nummer {fig_no}"}), 404
+        return jsonify({"error": msg}), 500
 
 
 @app.route("/settings")
@@ -461,6 +485,7 @@ def api_create_item():
             condition=data.get("condition", "N"),
             description=data.get("description", ""),
             remarks=data.get("remarks", ""),
+            stock_room=bool(data.get("stock_room")),
         )
         return jsonify(result)
     except Exception as e:

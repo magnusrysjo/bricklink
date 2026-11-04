@@ -136,7 +136,11 @@
                     <strong>{{ item_no }}</strong><br>
                     <small class="text-muted">{{ first.item.name }}</small>
                   </td>
-                  <td class="text-end fw-bold">{{ total_qty }}</td>
+                  {% set stockroom_qty = entries|selectattr('is_stock_room')|sum(attribute='quantity') %}
+                  <td class="text-end">
+                    <span class="fw-bold">{{ total_qty }}</span>
+                    {% if stockroom_qty %}<br><small class="text-info-emphasis">varav {{ stockroom_qty }} i Stockroom</small>{% endif %}
+                  </td>
                   <td class="text-center text-muted">
                     {% if entries|length > 1 %}<span class="expand-icon">▸</span>{% endif %}
                   </td>
@@ -161,7 +165,7 @@
                           {% for inv in entries %}
                           <tr data-inv-id="{{ inv.inventory_id }}">
                             <td class="text-center">{{ item_img(item_no, itype, inv.color_id or 0) }}</td>
-                            <td>{{ inv.color_name or '–' }}</td>
+                            <td>{{ inv.color_name or '–' }}<br><button type="button" class="btn btn-sm stock-toggle {{ 'stock-room' if inv.is_stock_room else 'for-sale' }}" data-stock="{{ 1 if inv.is_stock_room else 0 }}" title="Klicka för att flytta mellan butiken och Stockroom">{{ 'Stockroom' if inv.is_stock_room else 'Till salu' }}</button></td>
                             <td><input type="number" class="form-control form-control-sm inv-field" data-field="quantity" value="{{ inv.quantity }}" min="0"></td>
                             <td><input type="number" step="any" class="form-control form-control-sm weight-to-qty" placeholder="g"></td>
                             <td><input type="text" class="form-control form-control-sm inv-field" data-field="unit_price" value="{{ inv.unit_price }}"></td>
@@ -229,7 +233,7 @@
                   <td class="text-center">{{ item_img(item_no, itype, 0) }}</td>
                   <td>
                     <strong>{{ item_no }}</strong><br>
-                    <small class="text-muted">{{ inv.item.name }}</small>
+                    <small class="text-muted">{{ inv.item.name }}</small><br><button type="button" class="btn btn-sm stock-toggle {{ 'stock-room' if inv.is_stock_room else 'for-sale' }}" data-stock="{{ 1 if inv.is_stock_room else 0 }}" title="Klicka för att flytta mellan butiken och Stockroom">{{ 'Stockroom' if inv.is_stock_room else 'Till salu' }}</button>
                   </td>
                   <td>
                     <input type="number" class="form-control form-control-sm inv-field"
@@ -290,6 +294,13 @@
   .color-menu-name { flex: 1; white-space: nowrap; }
   .color-menu-id { color: #6c757d; font-size: .75rem; }
   .color-menu-empty { padding: 6px 10px; color: #6c757d; }
+  .stock-toggle {
+    --bs-btn-padding-y: 0; --bs-btn-padding-x: .45rem; --bs-btn-font-size: .7rem;
+    margin-top: 2px; border-radius: 999px; font-weight: 600; white-space: nowrap;
+  }
+  .stock-toggle.for-sale { color: #146c43; background: #d1e7dd; border: 1px solid #a3cfbb; }
+  .stock-toggle.stock-room { color: #055160; background: #cff4fc; border: 1px solid #9eeaf9; }
+  .stock-toggle:hover { filter: brightness(.95); }
   .inv-field { min-width: 60px; }
   .inv-field:focus { border-color: #0d6efd; box-shadow: 0 0 0 2px rgba(13,110,253,.2); }
 </style>
@@ -712,6 +723,36 @@ document.addEventListener('click', async (e) => {
   }
 });
 
+// Flytta en lagerpost mellan butiken och Stockroom
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.stock-toggle');
+  if (!btn) return;
+  e.stopPropagation();
+  const row = btn.closest('tr[data-inv-id]');
+  const toStockroom = btn.dataset.stock !== '1';
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = '…';
+  try {
+    const resp = await fetch(`/api/inventory/${row.dataset.invId}`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ is_stock_room: toStockroom })
+    });
+    const d = await resp.json().catch(() => ({}));
+    if (!resp.ok || d.error) throw new Error(d.error || resp.statusText);
+    btn.dataset.stock = toStockroom ? '1' : '0';
+    btn.classList.toggle('stock-room', toStockroom);
+    btn.classList.toggle('for-sale', !toStockroom);
+    btn.textContent = toStockroom ? 'Stockroom' : 'Till salu';
+  } catch (err) {
+    btn.textContent = label;
+    alert('Kunde inte flytta posten: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 // Ta bort inventory-post utan sidomladdning
 document.addEventListener('click', async (e) => {
   const btn = e.target.closest('.delete-inv-btn');
@@ -770,7 +811,7 @@ document.addEventListener('click', async (e) => {
              width="48" height="48" style="object-fit:contain"
              referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
       </td>
-      <td>${esc(colorName)}</td>
+      <td>${esc(colorName)}<br><button type="button" class="btn btn-sm stock-toggle for-sale" data-stock="0" title="Klicka för att flytta mellan butiken och Stockroom">Till salu</button></td>
       <td><input type="number" class="form-control form-control-sm inv-field" data-field="quantity" value="${esc(body.quantity)}" min="0"></td>
       <td><input type="number" step="any" class="form-control form-control-sm weight-to-qty" placeholder="g"></td>
       <td><input type="text" class="form-control form-control-sm inv-field" data-field="unit_price" value="${esc(body.unit_price)}"></td>
