@@ -406,7 +406,7 @@ async function fillPrice(tr) {
     const d = await (await fetch(`/api/catalog_price/${p.type}/${encodeURIComponent(p.no)}?color_id=${p.color_id || 0}`)).json();
     if (selectedPart(tr) !== p) return;  // användaren hann byta alternativ
     input.placeholder = d.avg_price ? 'Pris' : 'Ange pris';
-    if (d.avg_price) input.value = d.avg_price.toFixed(2);
+    if (d.avg_price) input.value = listPrice(d.avg_price);
   } catch {
     input.placeholder = 'Ange pris';
   }

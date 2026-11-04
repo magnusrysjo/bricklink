@@ -11,6 +11,17 @@
     .badge-N { background-color: #198754; }
     .badge-U { background-color: #6c757d; }
   </style>
+  <script>
+    // Utpris för nya lagerposter: snittpris + 10 %, avrundat uppåt till hel krona.
+    // Avrunda till ören först så att t.ex. 10,00 × 1,1 inte blir 11,0000000002 → 12.
+    const PRICE_MARKUP = 1.1;
+    function listPrice(avg) {
+      const p = parseFloat(avg);
+      if (!p) return '';
+      const withMarkup = Math.round(p * PRICE_MARKUP * 100) / 100;
+      return String(Math.ceil(withMarkup));
+    }
+  </script>
 </head>
 <body>
   <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm mb-4">
