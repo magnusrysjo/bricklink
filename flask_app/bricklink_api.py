@@ -33,6 +33,10 @@ def _q(value):
 def _data(resp, default):
     """Packa upp BrickLinks svar till "data", med begripliga fel istället för JSON-krascher."""
     where = f"{resp.request.method} {resp.url}" if resp.request is not None else resp.url
+    # Under underhåll skickar BrickLink vidare alla anrop till en HTML-sida
+    if "maintenance.bricklink.com" in (resp.url or ""):
+        logger.warning("BrickLink har underhåll (omdirigerad till %s)", resp.url)
+        raise RuntimeError("BrickLink har underhåll just nu och API:et svarar inte. Försök igen senare.")
     body = (resp.text or "").strip()
     if not body:
         if resp.ok:
