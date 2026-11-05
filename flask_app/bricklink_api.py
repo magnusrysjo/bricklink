@@ -1,5 +1,7 @@
 import os
 import html
+import logging
+from urllib.parse import quote
 from requests_oauthlib import OAuth1Session
 
 _category_cache: dict[int, str] = {}
@@ -20,6 +22,38 @@ def get_session():
 
 
 BASE_URL = "https://api.bricklink.com/api/store/v1"
+logger = logging.getLogger(__name__)
+
+
+def _q(value):
+    """URL-koda en sökvägsdel, t.ex. artikelnummer som innehåller / eller mellanslag."""
+    return quote(str(value), safe="")
+
+
+def _data(resp, default):
+    """Packa upp BrickLinks svar till "data", med begripliga fel istället för JSON-krascher."""
+    where = f"{resp.request.method} {resp.url}" if resp.request is not None else resp.url
+    body = (resp.text or "").strip()
+    if not body:
+        if resp.ok:
+            return default
+        raise RuntimeError(f"BrickLink {resp.status_code} (tomt svar) för {where}")
+    try:
+        payload = resp.json()
+    except ValueError:
+        snippet = " ".join(body.split())[:200]
+        logger.error("BrickLink svarade inte med JSON: %s -> HTTP %s: %s", where, resp.status_code, snippet)
+        raise RuntimeError(
+            f"BrickLink svarade inte med JSON (HTTP {resp.status_code}) för {where}: {snippet}"
+        )
+    meta = payload.get("meta") or {}
+    code = meta.get("code", resp.status_code)
+    if not resp.ok or (isinstance(code, int) and code >= 400):
+        detail = " ".join(x for x in (meta.get("message"), meta.get("description")) if x)
+        logger.error("BrickLink-fel %s för %s: %s", code, where, detail)
+        raise RuntimeError(f"BrickLink {code}: {detail or resp.reason} ({where})")
+    data = payload.get("data")
+    return default if data is None else data
 
 
 def _load_all_categories():
@@ -29,8 +63,7 @@ def _load_all_categories():
     try:
         session = get_session()
         resp = session.get(f"{BASE_URL}/categories")
-        resp.raise_for_status()
-        for cat in resp.json().get("data", []):
+        for cat in _data(resp, []):
             _category_cache[cat["category_id"]] = html.unescape(cat["category_name"])
             _category_parent[cat["category_id"]] = cat.get("parent_id") or 0
         _categories_loaded = True
@@ -63,9 +96,8 @@ def enrich_with_category_names(inventory: list) -> None:
 
 def get_item(item_type, item_no):
     session = get_session()
-    resp = session.get(f"{BASE_URL}/items/{item_type}/{item_no}")
-    resp.raise_for_status()
-    return resp.json().get("data", {})
+    resp = session.get(f"{BASE_URL}/items/{item_type}/{_q(item_no)}")
+    return _data(resp, {})
 
 
 def get_supersets(item_type, item_no, color_id=None):
@@ -74,17 +106,15 @@ def get_supersets(item_type, item_no, color_id=None):
     params = {}
     if color_id is not None:
         params["color_id"] = color_id
-    resp = session.get(f"{BASE_URL}/items/{item_type}/{item_no}/supersets", params=params)
-    resp.raise_for_status()
-    return resp.json().get("data", [])
+    resp = session.get(f"{BASE_URL}/items/{item_type}/{_q(item_no)}/supersets", params=params)
+    return _data(resp, [])
 
 
 def get_subsets(item_type, item_no):
     """Vilka delar en artikel består av, grupperat med eventuella alternativ."""
     session = get_session()
-    resp = session.get(f"{BASE_URL}/items/{item_type}/{item_no}/subsets")
-    resp.raise_for_status()
-    return resp.json().get("data", [])
+    resp = session.get(f"{BASE_URL}/items/{item_type}/{_q(item_no)}/subsets")
+    return _data(resp, [])
 
 
 def get_price_guide(item_type, item_no, color_id, condition="N"):
@@ -92,9 +122,8 @@ def get_price_guide(item_type, item_no, color_id, condition="N"):
     params = {"guide_type": "sold", "new_or_used": condition}
     if color_id:
         params["color_id"] = color_id
-    resp = session.get(f"{BASE_URL}/items/{item_type}/{item_no}/price", params=params)
-    resp.raise_for_status()
-    return resp.json().get("data", {})
+    resp = session.get(f"{BASE_URL}/items/{item_type}/{_q(item_no)}/price", params=params)
+    return _data(resp, {})
 
 
 def get_colors():
@@ -104,9 +133,8 @@ def get_colors():
     try:
         session = get_session()
         resp = session.get(f"{BASE_URL}/colors")
-        resp.raise_for_status()
         _colors_cache.extend(
-            sorted(resp.json().get("data", []), key=lambda c: c.get("color_name", ""))
+            sorted(_data(resp, []), key=lambda c: c.get("color_name", ""))
         )
         _colors_loaded = True
     except Exception:
@@ -129,15 +157,13 @@ def get_inventory(item_type=None):
     if item_type:
         params["item_type"] = item_type
     resp = session.get(f"{BASE_URL}/inventories", params=params)
-    resp.raise_for_status()
-    return [_unescape_item(e) for e in resp.json().get("data", [])]
+    return [_unescape_item(e) for e in _data(resp, [])]
 
 
 def get_inventory_item(inventory_id):
     session = get_session()
     resp = session.get(f"{BASE_URL}/inventories/{inventory_id}")
-    resp.raise_for_status()
-    return resp.json().get("data", {})
+    return _data(resp, {})
 
 
 def update_inventory_item(inventory_id, quantity=None, unit_price=None, description=None,
@@ -166,14 +192,13 @@ def update_inventory_item(inventory_id, quantity=None, unit_price=None, descript
     if not body:
         return get_inventory_item(inventory_id)
     resp = session.put(f"{BASE_URL}/inventories/{inventory_id}", json=body)
-    resp.raise_for_status()
-    return resp.json().get("data", {})
+    return _data(resp, {})
 
 
 def delete_inventory_item(inventory_id):
     session = get_session()
     resp = session.delete(f"{BASE_URL}/inventories/{inventory_id}")
-    resp.raise_for_status()
+    _data(resp, None)
     return True
 
 
@@ -183,23 +208,20 @@ def get_orders(direction="in", status=None):
     if status:
         params["status"] = status
     resp = session.get(f"{BASE_URL}/orders", params=params)
-    resp.raise_for_status()
-    return resp.json().get("data", [])
+    return _data(resp, [])
 
 
 def get_order(order_id):
     session = get_session()
     resp = session.get(f"{BASE_URL}/orders/{order_id}")
-    resp.raise_for_status()
-    return resp.json().get("data", {})
+    return _data(resp, {})
 
 
 def get_order_items(order_id):
     session = get_session()
     resp = session.get(f"{BASE_URL}/orders/{order_id}/items")
-    resp.raise_for_status()
     # Svaret är en lista av batchar; platta ut den
-    batches = resp.json().get("data", [])
+    batches = _data(resp, [])
     items = [item for batch in batches for item in batch]
     for item in items:
         _unescape_item(item)
@@ -223,6 +245,4 @@ def create_inventory_item(item_no, item_type, color_id, quantity, unit_price,
     if stock_room:
         body["stock_room_id"] = "A"
     resp = session.post(f"{BASE_URL}/inventories", json=body)
-    if not resp.ok:
-        raise RuntimeError(f"BrickLink {resp.status_code}: {resp.text}")
-    return resp.json().get("data", {})
+    return _data(resp, {})
