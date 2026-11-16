@@ -112,6 +112,10 @@
   }
   .loc-sale { color: #146c43; background: #d1e7dd; border: 1px solid #a3cfbb; }
   .loc-room { color: #055160; background: #cff4fc; border: 1px solid #9eeaf9; }
+  .chip-body { display: flex; flex-direction: column; }
+  .lot-remark { font-size: .72rem; color: #495057; margin-top: 1px; }
+  .lot-remark .loc-tag { margin-left: 0; font-size: .6rem; }
+  .build-plan .plan-lot { display: block; }
 </style>
 
 <div class="modal fade" id="buildModal" tabindex="-1" aria-labelledby="buildTitle" aria-hidden="true">
@@ -298,14 +302,24 @@ function chip(p, cls) {
   const price = cls === 'missing'
     ? ` · <span class="part-price" data-price-key="${esc(pkey(p.type, p.no, p.color_id))}">${partPriceHtml(pkey(p.type, p.no, p.color_id))}</span>`
     : '';
+  const remarks = owned ? remarksHtml(p) : '';
   const inner = `
       <img src="${partImg(p)}" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
-      <span>${qty}<strong>${esc(p.no)}</strong>${color ? ' · ' + esc(color) : ''}${stockNote}${price}${tags}</span>`;
+      <span class="chip-body"><span>${qty}<strong>${esc(p.no)}</strong>${color ? ' · ' + esc(color) : ''}${stockNote}${price}${tags}</span>${remarks}</span>`;
   if (cls === 'missing') {
     return `<a class="part-chip ${cls}" href="${esc(bricklinkUrl(p))}" target="_blank" rel="noopener"
                title="${esc(p.name)} – öppna på BrickLink">${inner} <span class="chip-link">↗</span></a>`;
   }
   return `<span class="part-chip ${cls}" title="${esc(p.name)}">${inner}</span>`;
+}
+
+// Anmärkningen på varje lagerpost för delen, så man vet var den ligger
+function remarksHtml(p) {
+  const withRemarks = (lots[`${p.type}|${p.no}|${p.color_id}`] || []).filter(l => l.quantity > 0 && l.remarks.trim());
+  if (!withRemarks.length) return '';
+  return withRemarks.map(l =>
+    `<span class="lot-remark"><span class="loc-tag ${l.stock_room ? 'loc-room' : 'loc-sale'}">${l.stock_room ? 'Stockroom' : 'Butik'}</span> ${esc(l.remarks)}</span>`
+  ).join('');
 }
 
 // BrickLinks katalogsida för delen, med färgen vald och fliken "till salu" öppen
@@ -689,16 +703,18 @@ function allocate(key, need, first) {
   for (const lot of ordered) {
     if (left <= 0) break;
     const q = Math.min(lot.quantity, left);
-    take.push({ inventory_id: lot.inventory_id, quantity: q, stock_room: lot.stock_room });
+    take.push({ inventory_id: lot.inventory_id, quantity: q, stock_room: lot.stock_room, remarks: lot.remarks || '' });
     left -= q;
   }
   return left > 0 ? null : take;
 }
 
-function planText(take) {
-  const room = take.filter(t => t.stock_room).reduce((n, t) => n + t.quantity, 0);
-  const sale = take.filter(t => !t.stock_room).reduce((n, t) => n + t.quantity, 0);
-  return [room && `${room} Stockroom`, sale && `${sale} Butik`].filter(Boolean).join(' + ');
+// En rad per lagerpost som plockas: antal, plats och postens anmärkning
+function planHtml(take) {
+  return take.map(t =>
+    `<span class="plan-lot">${t.quantity} från ${t.stock_room ? 'Stockroom' : 'Butik'}` +
+    (t.remarks.trim() ? `: <strong>${esc(t.remarks)}</strong>` : '') + '</span>'
+  ).join('');
 }
 
 function locationOptions(key, current) {
@@ -727,7 +743,7 @@ function renderBuildRows() {
       <td><strong>${esc(p.no)}</strong> ${esc(color)}<br><small class="text-muted">${esc(p.name)}</small></td>
       <td>${p.quantity}</td>
       <td><select class="form-select form-select-sm build-loc">${locationOptions(keyOf(p), r.first)}</select>
-          <small class="text-muted build-plan">${esc(planText(r.take))}</small></td>
+          <small class="text-muted build-plan">${planHtml(r.take)}</small></td>
       <td class="build-state small"></td></tr>`;
   }).join('');
   const missing = build.rows.filter(r => !r.take);
@@ -788,7 +804,7 @@ document.getElementById('buildParts').addEventListener('change', e => {
   const r = build.rows[Number(tr.dataset.i)];
   r.first = e.target.value;
   r.take = allocate(keyOf(r.part), r.part.quantity, r.first);
-  tr.querySelector('.build-plan').textContent = planText(r.take);
+  tr.querySelector('.build-plan').innerHTML = planHtml(r.take);
 });
 document.getElementById('buildPrice').addEventListener('input', updateBuildButton);
 document.getElementById('buildAck').addEventListener('change', updateBuildButton);

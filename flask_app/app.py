@@ -126,6 +126,7 @@ def api_minifig_seeds():
             "quantity": entry.get("quantity", 0),
             "stock_room": bool(entry.get("is_stock_room")),
             "condition": entry.get("new_or_used", ""),
+            "remarks": entry.get("remarks") or "",
         })
         if itype == "PART" and "torso" in entry.get("category_name", "").lower():
             seeds[(no, color_id)] = {
