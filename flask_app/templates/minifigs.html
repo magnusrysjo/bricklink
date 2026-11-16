@@ -114,6 +114,69 @@
   .loc-room { color: #055160; background: #cff4fc; border: 1px solid #9eeaf9; }
 </style>
 
+<div class="modal fade" id="buildModal" tabindex="-1" aria-labelledby="buildTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="buildTitle">Bygg figur och lägg i butiken</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Stäng"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex gap-3 align-items-center mb-3">
+          <img id="buildImg" class="fig-img" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
+          <div>
+            <strong id="buildFigNo"></strong> <span id="buildFigName"></span><br>
+            <span id="buildMarket" class="small text-muted"></span>
+          </div>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-sm-3">
+            <label class="form-label small mb-0" for="buildPrice">Pris i butiken</label>
+            <input type="text" id="buildPrice" class="form-control form-control-sm" inputmode="decimal">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label small mb-0" for="buildCond">Skick</label>
+            <select id="buildCond" class="form-select form-select-sm">
+              <option value="N">Ny</option>
+              <option value="U" selected>Begagnad</option>
+            </select>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label small mb-0" for="buildRemarks">Anmärkning</label>
+            <input type="text" id="buildRemarks" class="form-control form-control-sm">
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <strong class="me-auto">Delar som plockas från lagret</strong>
+          <span class="small text-muted">Plocka i första hand från</span>
+          <select id="buildPref" class="form-select form-select-sm" style="width:auto">
+            <option value="room" selected>Stockroom</option>
+            <option value="sale">Butik</option>
+          </select>
+        </div>
+        <table class="table table-sm align-middle mb-2">
+          <thead class="table-light">
+            <tr><th style="width:44px"></th><th>Del</th><th style="width:60px">Antal</th><th style="width:170px">Plocka från</th><th style="width:44px"></th></tr>
+          </thead>
+          <tbody id="buildParts"></tbody>
+        </table>
+        <div id="buildMissingBox" class="alert alert-warning py-2 small" style="display:none">
+          <div id="buildMissingText"></div>
+          <label class="form-check mt-1 mb-0">
+            <input type="checkbox" class="form-check-input" id="buildAck">
+            <span class="form-check-label">Jag har de delarna ändå. Bygg figuren utan att dra av dem från lagret.</span>
+          </label>
+        </div>
+        <div id="buildResult" class="small"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-danger" id="buildConfirm">Lägg figuren i butiken och plocka delarna</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 const figs = new Map();       // figurnummer -> {no, name, groups, viaTorso}
@@ -122,6 +185,7 @@ const priceQueue = [];
 let priceWorkers = 0;
 let stock = {};
 let stockroom = {};   // del av stock som ligger i Stockroom
+let lots = {};        // "TYP|nr|färg" -> [{inventory_id, quantity, stock_room}]
 let colorNames = {};
 
 const pkey = (type, no, color) => `${type}|${no}|${color || 0}`;
@@ -325,7 +389,10 @@ function render() {
               ${status}
               <span class="text-muted small">${ev.total - ev.missing.length}/${ev.total} delar</span>
               ${owned ? `<span class="badge bg-secondary">${owned} st som hel figur i lager</span>` : ''}
-              <button type="button" class="btn btn-link btn-sm p-0 ms-auto add-fig-parts" data-no="${esc(fig.no)}">Lägg till delar →</button>
+              <span class="ms-auto d-flex gap-2 align-items-center">
+                <button type="button" class="btn btn-link btn-sm p-0 add-fig-parts" data-no="${esc(fig.no)}">Lägg till delar →</button>
+                <button type="button" class="btn btn-sm ${ev.missing.length ? 'btn-outline-danger' : 'btn-danger'} build-fig" data-no="${esc(fig.no)}">Bygg &amp; sälj</button>
+              </span>
             </div>
             <div>${esc(fig.name)}</div>
             ${fig.theme ? `<div class="small text-muted">${esc(fig.theme)}${fig.subtheme ? ' · ' + esc(fig.subtheme) : ''}</div>` : ''}
@@ -366,6 +433,7 @@ async function run() {
     if (seedData.error) throw new Error(seedData.error);
     stock = seedData.stock;
     stockroom = seedData.stockroom || {};
+    lots = seedData.lots || {};
     const colors = await colorResp.json();
     if (Array.isArray(colors)) colors.forEach(c => { colorNames[c.color_id] = c.color_name; });
 
@@ -599,10 +667,197 @@ document.getElementById('addFigSubmit').addEventListener('click', async (e) => {
 
 // "Lägg till delar" från ett resultatkort i analysen
 document.getElementById('results').addEventListener('click', e => {
+  const build = e.target.closest('.build-fig');
+  if (build) { openBuild(build.dataset.no); return; }
   const btn = e.target.closest('.add-fig-parts');
   if (!btn) return;
   searchFig(btn.dataset.no);
   document.getElementById('addFigCard').scrollIntoView({ behavior: 'smooth' });
+});
+// ---- Bygg figur: lägg den i butiken och plocka delarna ----
+const build = { fig: null, rows: [] };
+const keyOf = p => `${p.type}|${p.no}|${p.color_id}`;
+let buildModal = null;
+
+// Plockplan för en del: ta från vald plats först, fyll på från den andra vid behov
+function allocate(key, need, first) {
+  const ordered = [...(lots[key] || [])].filter(l => l.quantity > 0).sort((a, b) =>
+    ((a.stock_room === (first === 'room')) ? 0 : 1) - ((b.stock_room === (first === 'room')) ? 0 : 1) ||
+    b.quantity - a.quantity);
+  const take = [];
+  let left = need;
+  for (const lot of ordered) {
+    if (left <= 0) break;
+    const q = Math.min(lot.quantity, left);
+    take.push({ inventory_id: lot.inventory_id, quantity: q, stock_room: lot.stock_room });
+    left -= q;
+  }
+  return left > 0 ? null : take;
+}
+
+function planText(take) {
+  const room = take.filter(t => t.stock_room).reduce((n, t) => n + t.quantity, 0);
+  const sale = take.filter(t => !t.stock_room).reduce((n, t) => n + t.quantity, 0);
+  return [room && `${room} Stockroom`, sale && `${sale} Butik`].filter(Boolean).join(' + ');
+}
+
+function locationOptions(key, current) {
+  const room = (lots[key] || []).filter(l => l.stock_room).reduce((n, l) => n + l.quantity, 0);
+  const sale = (lots[key] || []).filter(l => !l.stock_room).reduce((n, l) => n + l.quantity, 0);
+  const opts = [];
+  if (room) opts.push(['room', `Stockroom (${room} st)`]);
+  if (sale) opts.push(['sale', `Butik (${sale} st)`]);
+  return opts.map(([v, label]) => `<option value="${v}" ${v === current ? 'selected' : ''}>${label}</option>`).join('');
+}
+
+function renderBuildRows() {
+  const tbody = document.getElementById('buildParts');
+  tbody.innerHTML = build.rows.map((r, i) => {
+    const p = r.part;
+    const color = colorNames[p.color_id] || '';
+    if (!r.take) {
+      return `<tr class="table-warning">
+        <td><img src="${partImg(p)}" width="36" height="36" style="object-fit:contain" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"></td>
+        <td><strong>${esc(p.no)}</strong> ${esc(color)}<br><small class="text-muted">${esc(p.name)}</small></td>
+        <td>${p.quantity}</td>
+        <td colspan="2" class="small">Saknas i lagret och dras inte av</td></tr>`;
+    }
+    return `<tr data-i="${i}">
+      <td><img src="${partImg(p)}" width="36" height="36" style="object-fit:contain" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"></td>
+      <td><strong>${esc(p.no)}</strong> ${esc(color)}<br><small class="text-muted">${esc(p.name)}</small></td>
+      <td>${p.quantity}</td>
+      <td><select class="form-select form-select-sm build-loc">${locationOptions(keyOf(p), r.first)}</select>
+          <small class="text-muted build-plan">${esc(planText(r.take))}</small></td>
+      <td class="build-state small"></td></tr>`;
+  }).join('');
+  const missing = build.rows.filter(r => !r.take);
+  document.getElementById('buildMissingBox').style.display = missing.length ? '' : 'none';
+  document.getElementById('buildMissingText').textContent = missing.length
+    ? `${missing.length} del${missing.length > 1 ? 'ar' : ''} finns inte i lagret: ${missing.map(r => r.part.no).join(', ')}.` : '';
+  updateBuildButton();
+}
+
+function updateBuildButton() {
+  const missing = build.rows.some(r => !r.take);
+  const ack = document.getElementById('buildAck').checked;
+  const price = parseFloat(document.getElementById('buildPrice').value.replace(',', '.'));
+  document.getElementById('buildConfirm').disabled = build.busy || build.done || !(price > 0) || (missing && !ack);
+}
+
+function planRows(first) {
+  build.rows = build.fig.groups.map(group => {
+    const part = group.find(o => stockOf(o) >= o.quantity) || group[0];
+    const take = stockOf(part) >= part.quantity ? allocate(keyOf(part), part.quantity, first) : null;
+    return { part, first, take };
+  });
+}
+
+function openBuild(no) {
+  const fig = figs.get(no);
+  if (!fig) return;
+  build.fig = fig;
+  build.busy = false;
+  build.done = false;
+  const pref = document.getElementById('buildPref').value;
+  planRows(pref);
+  document.getElementById('buildImg').src = partImg({ type: 'MINIFIG', no });
+  document.getElementById('buildImg').style.visibility = '';
+  document.getElementById('buildFigNo').textContent = no;
+  document.getElementById('buildFigName').textContent = fig.name;
+  const pr = prices.get(figKey(no));
+  document.getElementById('buildMarket').textContent = pr && pr.avg_price
+    ? `Snittpris begagnad ${pr.avg_price.toFixed(2)} ${pr.currency}` : 'Inget snittpris tillgängligt, ange pris själv.';
+  document.getElementById('buildPrice').value = pr && pr.avg_price ? listPrice(pr.avg_price) : '';
+  document.getElementById('buildRemarks').value = `${new Date().toISOString().slice(0, 10)} byggd av delar`;
+  document.getElementById('buildAck').checked = false;
+  document.getElementById('buildResult').textContent = '';
+  document.getElementById('buildConfirm').textContent = 'Lägg figuren i butiken och plocka delarna';
+  renderBuildRows();
+  buildModal = buildModal || new bootstrap.Modal(document.getElementById('buildModal'));
+  buildModal.show();
+}
+
+document.getElementById('buildPref').addEventListener('change', e => {
+  if (!build.fig || build.done) return;
+  planRows(e.target.value);
+  renderBuildRows();
+});
+document.getElementById('buildParts').addEventListener('change', e => {
+  if (!e.target.classList.contains('build-loc')) return;
+  const tr = e.target.closest('tr[data-i]');
+  const r = build.rows[Number(tr.dataset.i)];
+  r.first = e.target.value;
+  r.take = allocate(keyOf(r.part), r.part.quantity, r.first);
+  tr.querySelector('.build-plan').textContent = planText(r.take);
+});
+document.getElementById('buildPrice').addEventListener('input', updateBuildButton);
+document.getElementById('buildAck').addEventListener('change', updateBuildButton);
+
+document.getElementById('buildConfirm').addEventListener('click', async () => {
+  const result = document.getElementById('buildResult');
+  const take = build.rows.filter(r => r.take).flatMap(r => r.take);
+  build.busy = true;
+  updateBuildButton();
+  result.className = 'small text-muted';
+  result.textContent = 'Lägger in figuren och plockar delar…';
+  try {
+    const resp = await fetch('/api/minifigs/build', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        fig_no: build.fig.no,
+        unit_price: document.getElementById('buildPrice').value.trim(),
+        condition: document.getElementById('buildCond').value,
+        remarks: document.getElementById('buildRemarks').value,
+        take: take.map(t => ({ inventory_id: t.inventory_id, quantity: t.quantity })),
+      })
+    });
+    const d = await resp.json().catch(() => ({ error: resp.statusText }));
+    if (!resp.ok || d.error) throw new Error(d.error || resp.statusText);
+
+    // Uppdatera lokala saldon så analysen stämmer utan att köras om
+    const failedIds = new Set(d.results.filter(x => !x.ok).map(x => x.inventory_id));
+    for (const r of build.rows.filter(r => r.take)) {
+      const key = keyOf(r.part);
+      for (const t of r.take) {
+        if (failedIds.has(t.inventory_id)) continue;
+        const lot = (lots[key] || []).find(l => l.inventory_id === t.inventory_id);
+        if (lot) lot.quantity -= t.quantity;
+        stock[key] = (stock[key] || 0) - t.quantity;
+        if (t.stock_room) stockroom[key] = (stockroom[key] || 0) - t.quantity;
+      }
+      lots[key] = (lots[key] || []).filter(l => l.quantity > 0);
+    }
+    const fk = `MINIFIG|${build.fig.no}|0`;
+    stock[fk] = (stock[fk] || 0) + 1;
+
+    document.querySelectorAll('#buildParts tr[data-i]').forEach(tr => {
+      const r = build.rows[Number(tr.dataset.i)];
+      const bad = r.take.find(t => failedIds.has(t.inventory_id));
+      const state = tr.querySelector('.build-state');
+      state.textContent = bad ? '✗' : '✓';
+      state.className = 'build-state small ' + (bad ? 'text-danger' : 'text-success');
+      if (bad) state.title = d.results.find(x => x.inventory_id === bad.inventory_id).error;
+      tr.querySelector('.build-loc').disabled = true;
+    });
+    build.done = true;
+    if (failedIds.size) {
+      result.className = 'small text-danger';
+      result.textContent = `Figuren ligger i butiken, men ${failedIds.size} lagerpost(er) kunde inte dras av ` +
+        '(hovra över ✗ för orsak). Justera dem i inventoryt.';
+    } else {
+      result.className = 'small text-success';
+      result.textContent = 'Klart! Figuren ligger i butiken och delarna är avdragna från lagret.';
+    }
+    document.getElementById('buildConfirm').textContent = 'Klart';
+    render();
+  } catch (err) {
+    result.className = 'small text-danger';
+    result.textContent = err.message;
+  } finally {
+    build.busy = false;
+    updateBuildButton();
+  }
 });
 </script>
 {% endblock %}

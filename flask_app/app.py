@@ -112,6 +112,7 @@ def api_minifig_seeds():
 
     stock = defaultdict(int)
     stockroom = defaultdict(int)  # del av stock som ligger i Stockroom
+    lots = defaultdict(list)      # enskilda lagerposter per del, för att kunna plocka från dem
     seeds = {}
     for entry in inventory:
         item = entry.get("item", {})
@@ -120,6 +121,12 @@ def api_minifig_seeds():
         stock[key] += entry.get("quantity", 0)
         if entry.get("is_stock_room"):
             stockroom[key] += entry.get("quantity", 0)
+        lots[key].append({
+            "inventory_id": entry.get("inventory_id"),
+            "quantity": entry.get("quantity", 0),
+            "stock_room": bool(entry.get("is_stock_room")),
+            "condition": entry.get("new_or_used", ""),
+        })
         if itype == "PART" and "torso" in entry.get("category_name", "").lower():
             seeds[(no, color_id)] = {
                 "no": no,
@@ -127,7 +134,76 @@ def api_minifig_seeds():
                 "color_name": entry.get("color_name", ""),
                 "name": item.get("name", ""),
             }
-    return jsonify({"seeds": list(seeds.values()), "stock": stock, "stockroom": stockroom})
+    return jsonify({"seeds": list(seeds.values()), "stock": stock, "stockroom": stockroom, "lots": lots})
+
+
+@app.route("/api/minifigs/build", methods=["POST"])
+def api_minifig_build():
+    """Lägg en byggd minifigur i butiken och dra av delarna från de valda lagerposterna.
+
+    Alla lagerposter kontrolleras innan något ändras. Därefter skapas figuren,
+    och först sedan dras delarna av, så att inget plockas bort om figuren inte gick att skapa.
+    """
+    data = request.get_json(silent=True) or {}
+    fig_no = str(data.get("fig_no", "")).strip()
+    if not fig_no:
+        return jsonify({"error": "Figurnummer saknas"}), 400
+    try:
+        price = float(str(data.get("unit_price", "")).replace(",", "."))
+    except ValueError:
+        return jsonify({"error": "Ogiltigt pris"}), 400
+    if price <= 0:
+        return jsonify({"error": "Priset måste vara större än 0"}), 400
+    condition = data.get("condition", "U") if data.get("condition") in ("N", "U") else "U"
+
+    need = defaultdict(int)
+    try:
+        for t in data.get("take") or []:
+            qty = int(t["quantity"])
+            if qty <= 0:
+                raise ValueError
+            need[int(t["inventory_id"])] += qty
+    except (KeyError, TypeError, ValueError):
+        return jsonify({"error": "Ogiltig lista över delar att plocka"}), 400
+
+    # 1. Kontrollera aktuella saldon innan något ändras
+    current = {}
+    short = []
+    try:
+        for inv_id, qty in need.items():
+            lot = bl.get_inventory_item(inv_id)
+            current[inv_id] = int(lot.get("quantity", 0))
+            if current[inv_id] < qty:
+                item = lot.get("item", {})
+                short.append(f"{item.get('no', inv_id)}: behöver {qty}, posten har {current[inv_id]}")
+    except Exception as e:
+        return jsonify({"error": f"Kunde inte kontrollera lagret: {e}"}), 502
+    if short:
+        return jsonify({"error": "Lagret har ändrats och räcker inte: " + "; ".join(short)}), 409
+
+    # 2. Lägg figuren i butiken
+    try:
+        created = bl.create_inventory_item(
+            item_no=fig_no, item_type="MINIFIG", color_id=0, quantity=1, unit_price=price,
+            condition=condition, remarks=data.get("remarks", ""), stock_room=False,
+        )
+    except Exception as e:
+        return jsonify({"error": f"Figuren kunde inte läggas in, inga delar har plockats: {e}"}), 502
+
+    # 3. Dra av delarna
+    results = []
+    for inv_id, qty in need.items():
+        remaining = current[inv_id] - qty
+        try:
+            if remaining <= 0:
+                bl.delete_inventory_item(inv_id)
+            else:
+                bl.update_inventory_item(inv_id, quantity=remaining)
+            results.append({"inventory_id": inv_id, "ok": True, "remaining": max(remaining, 0)})
+        except Exception as e:
+            app.logger.error("Kunde inte dra av lagerpost %s vid bygge av %s: %s", inv_id, fig_no, e)
+            results.append({"inventory_id": inv_id, "ok": False, "error": str(e)})
+    return jsonify({"inventory_id": created.get("inventory_id"), "results": results})
 
 
 @app.route("/api/minifigs/for_part/<path:part_no>")
